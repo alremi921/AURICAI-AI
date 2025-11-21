@@ -1,9 +1,6 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import datetime
-import requests
-from bs4 import BeautifulSoup
 import plotly.express as px
 
 # ============= STYLE =============
@@ -42,104 +39,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ============= FUNCTIONS =============
-def fetch_history(symbol, days="1y"):
-    df = yf.Ticker(symbol).history(period=days)
-    return df
+# ============= FETCH FUNCTIONS =============
+def fetch_history(symbol, period="1y"):
+    return yf.Ticker(symbol).history(period=period)
 
 
 def fetch_last_price(symbol):
-    try:
-        return yf.Ticker(symbol).history(period="5d")["Close"].iloc[-1]
-    except:
+    df = yf.Ticker(symbol).history(period="5d")
+    if df.empty:
         return None
+    return df["Close"].iloc[-1]
 
 
-# ForexFactory scraping
-def fetch_forex_factory():
-    url = "https://www.forexfactory.com/calendar"
-    page = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    soup = BeautifulSoup(page.text, "html.parser")
-
-    rows = soup.select("tr.calendar_row")
-
-    events = []
-    for r in rows:
-        impact = r.get("data-impact")
-        if impact not in ["High", "Medium"]:  
-            continue
-
-        title = r.get("data-event")
-        currency = r.get("data-symbol")
-        actual = r.get("data-actual")
-        forecast = r.get("data-forecast")
-
-        if currency != "USD":
-            continue
-
-        if actual and forecast:
-            try:
-                a = float(actual.replace(",", ""))
-                f = float(forecast.replace(",", ""))
-                delta = a - f
-            except:
-                delta = None
-        else:
-            delta = None
-
-        events.append({
-            "title": title,
-            "actual": actual,
-            "forecast": forecast,
-            "impact": impact,
-            "delta": delta
-        })
-
-    return pd.DataFrame(events)
-
-
-def score_fundamentals(df):
-    score = 0
-    for _, row in df.iterrows():
-        if row["delta"] is None:
-            continue
-
-        # > forecast bullish USD
-        if row["delta"] > 0:
-            score += 1
-        else:
-            score -= 1
-
-    return score
-
-
-# ============= FETCH DATA =============
+# ============= LOAD DATA =============
 dxy_df = fetch_history("DX-Y.NYB")
 vix_df = fetch_history("^VIX")
 
 dxy_price = fetch_last_price("DX-Y.NYB")
 vix_price = fetch_last_price("^VIX")
 
-forex_df = fetch_forex_factory()
-fx_score = score_fundamentals(forex_df)
+# ============= MAIN HEADER =============
+st.title("💵 USD Macro Dashboard — Professional Version")
+st.write("Realtime makro přehled + grafy DXY a VIX")
 
-# ============= COMBINED SENTIMENT =============
-total_score = fx_score
+
+# ============= SENTIMENT PLACEHOLDER (FUNDAMENTS WILL FEED THIS) =============
 sentiment = "NEUTRAL"
 sentiment_color = PRIMARY_BLUE
 
-if total_score > 2:
-    sentiment = "BULLISH USD"
-    sentiment_color = PRIMARY_GREEN
-elif total_score < -2:
-    sentiment = "BEARISH USD"
-    sentiment_color = PRIMARY_RED
-
-# ============= HEADER =============
-st.title("💵 USD Macro Dashboard — Professional Version")
-st.write("Realtime makro fundamenty + DXY a VIX grafy + sentiment USD")
-
-# ============= MAIN RESULT =============
 st.markdown(
     f"""
     <div class='result-box' style="background:{sentiment_color}15;">
@@ -150,7 +77,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ============= METRICS =============
+
+# ============= DXY + VIX CARDS =============
 col1, col2 = st.columns(2)
 
 with col1:
@@ -167,13 +95,122 @@ with col2:
     st.plotly_chart(px.line(vix_df, y="Close", title="VIX — Daily Line Chart"), use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ============= FUNDAMENTALS TABLE =============
-st.subheader("📰 Realtime Fundamentální Zprávy (ForexFactory)")
 
-st.dataframe(forex_df)
+# ========= PLACE FOR FUNDAMENTS + SEASONALITY =========
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import plotly.express as px
+import yfinance as yf
+import streamlit as st
 
-st.write(f"### Celkové fundamentální skóre: **{fx_score}**")
+# =====================================================
+# 1️⃣   ECONOMIC CALENDAR (Investing.com, HIGH IMPACT ONLY)
+# =====================================================
+def fetch_usd_high_impact():
+    url = "https://www.investing.com/economic-calendar/"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    page = requests.get(url, headers=headers)
+    soup = BeautifulSoup(page.text, "html.parser")
+
+    rows = soup.select("tr.js-event-item")
+
+    dataset = []
+
+    for row in rows:
+        try:
+            currency = row.get("data-event-currency")
+            impact = row.get("data-impact")  # 1 = low, 2 = medium, 3 = high
+
+            if currency != "USD" or impact != "3":
+                continue
+
+            title = row.get("data-event-title")
+            actual = row.get("data-event-actual")
+            forecast = row.get("data-event-forecast")
+
+            if not actual or not forecast or actual == "-" or forecast == "-":
+                continue
+
+            # convert values
+            def to_float(x):
+                x = x.replace(",", "").replace("%", "")
+                return float(x)
+
+            a = to_float(actual)
+            f = to_float(forecast)
+
+            # scoring
+            if a > f:
+                signal = 1
+            elif a < f:
+                signal = -1
+            else:
+                signal = 0
+
+            dataset.append({
+                "Report": title,
+                "Actual": actual,
+                "Forecast": forecast,
+                "Impact": "High",
+                "Signal": signal
+            })
+        except:
+            continue
+
+    return pd.DataFrame(dataset)
+
+
+# =====================================================
+# 2️⃣   SEASONALITY (20Y DXY)
+# =====================================================
+def get_seasonality():
+    df = yf.Ticker("DX-Y.NYB").history(period="20y")
+    df["Month"] = df.index.month
+    df["Return"] = df["Close"].pct_change()
+
+    out = df.groupby("Month")["Return"].mean().reset_index()
+    out["Return"] = out["Return"] * 100
+
+    out["Month"] = out["Month"].map({
+        1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
+        7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"
+    })
+
+    return out
+
+
+# =====================================================
+# 3️⃣   STREAMLIT SECTION — INSERT HERE INTO MAIN APP
+# =====================================================
+
+st.header("📰 High-Impact Fundamenty (USD)")
+
+cal = fetch_usd_high_impact()
+
+if cal.empty:
+    st.warning("⚠️ Žádné USD high-impact zprávy dnes zatím nejsou.")
+else:
+    st.dataframe(cal, use_container_width=True)
+    total_score = cal["Signal"].sum()
+    st.subheader(f"📊 Celkové fundamentální skóre USD: **{total_score}**")
+
+
+# Seasonality chart
+st.header("📈 USD Seasonality — 20 Year Pattern")
+
+season = get_seasonality()
+fig = px.bar(
+    season,
+    x="Month",
+    y="Return",
+    title="DXY Seasonality (% avg return per month, 20 years)",
+    color="Return",
+    color_continuous_scale="Bluered"
+)
+st.plotly_chart(fig, use_container_width=True)
+
 
 # FOOTER
-st.write("---")
-st.caption("Dashboard v.2.0 — Realtime Macro Engine Enhanced")
+st.caption("Dashboard v.2.0 — Base version (bez fundamentů)")
