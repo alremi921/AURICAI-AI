@@ -97,83 +97,100 @@ with col2:
 
 
 # ========= PLACE FOR FUNDAMENTS + SEASONALITY =========
-import streamlit as st
-import pandas as pd
+# ===== FUNDAMENTY - TradingEconomics API (guest:guest) =====
 import requests
-import yfinance as yf
-import plotly.express as px
+import pandas as pd
 from datetime import datetime, timedelta
-import time
+import streamlit as st
 
+TE_USER = "guest"
+TE_PASS = "guest"
 
-# ============================================================
-# 🔄  AUTO REFRESH (90 minut – bez externích knihoven)
-# ============================================================
+def fetch_te_us_calendar_last_30d():
+    """
+    Fetch TradingEconomics calendar for United States last 30 days.
+    Uses demo credentials guest:guest.
+    Returns DataFrame with Date, Event, Actual, Forecast, Previous, Impact, Signal.
+    """
 
-REFRESH_INTERVAL = 90 * 60   # 90 min
-current_ts = int(time.time())
-
-if "last_refresh" not in st.session_state:
-    st.session_state.last_refresh = current_ts
-
-if current_ts - st.session_state.last_refresh > REFRESH_INTERVAL:
-    st.session_state.last_refresh = current_ts
-    st.experimental_rerun()
-
-
-# ============================================================
-# 1️⃣ FUNDAMENTY – FMP Economic Calendar (USD reports)
-# ============================================================
-
-API_KEY = "demo"
-
-def fetch_usd_reports_last_month():
     end = datetime.utcnow()
     start = end - timedelta(days=30)
 
-    url = (
-        f"https://financialmodelingprep.com/api/v3/economic_calendar"
-        f"?from={start.strftime('%Y-%m-%d')}"
-        f"&to={end.strftime('%Y-%m-%d')}"
-        f"&apikey={API_KEY}"
-    )
+    # TradingEconomics calendar endpoint (demo usage)
+    url = "https://api.tradingeconomics.com/calendar"
+    params = {
+        "country": "united states",
+        "from": start.strftime("%Y-%m-%d"),
+        "to": end.strftime("%Y-%m-%d"),
+        "c": f"{TE_USER}:{TE_PASS}"
+    }
 
-    r = requests.get(url)
-    if r.status_code != 200:
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        if r.status_code != 200:
+            st.warning(f"TradingEconomics API returned status {r.status_code}")
+            return pd.DataFrame()
+        items = r.json()
+    except Exception as e:
+        st.warning(f"Chyba při volání TradingEconomics: {e}")
         return pd.DataFrame()
 
-    events = r.json()
     rows = []
-
-    for e in events:
-        if e.get("country") != "US":
+    for e in items:
+        # Some events may not use these exact keys; guard with .get
+        country = e.get("Country") or e.get("country") or e.get("location")
+        if country is None or "united" not in str(country).lower():
             continue
-        
-        actual = e.get("actual")
-        forecast = e.get("estimate")
-        previous = e.get("previous")
 
-        # Forecast není v API → doplníme previous
+        event = e.get("Event") or e.get("event") or e.get("title") or ""
+        date_raw = e.get("Date") or e.get("date") or e.get("time") or ""
+        # normalize date to YYYY-MM-DD
+        try:
+            date = pd.to_datetime(date_raw).strftime("%Y-%m-%d")
+        except:
+            date = (e.get("DateTime") or date_raw)[:10] if date_raw else ""
+
+        actual = e.get("Actual") if e.get("Actual") is not None else e.get("actual")
+        forecast = e.get("Forecast") if e.get("Forecast") is not None else e.get("estimate")
+        previous = e.get("Previous") if e.get("Previous") is not None else e.get("previous")
+        impact = e.get("Impact") or e.get("impact") or e.get("importance") or ""
+
+        # If forecast missing, fallback to previous (common practice)
         if forecast is None:
             forecast = previous
 
+        # Keep only events that have actual and forecast/previous
         if actual is None or forecast is None:
             continue
 
-        # sentiment výpočet
-        if actual > forecast:
+        # Convert to float if possible (guard)
+        def to_num(x):
+            try:
+                return float(x)
+            except:
+                return None
+
+        a = to_num(actual)
+        f = to_num(forecast)
+        prev = to_num(previous)
+
+        if a is None or f is None:
+            continue
+
+        if a > f:
             signal = 1
-        elif actual < forecast:
+        elif a < f:
             signal = -1
         else:
             signal = 0
 
         rows.append({
-            "Date": e.get("date", "")[:10],
-            "Report": e.get("event", ""),
-            "Actual": actual,
-            "Forecast": forecast,
-            "Previous": previous,
+            "Date": date,
+            "Report": event,
+            "Actual": a,
+            "Forecast": f,
+            "Previous": prev,
+            "Impact": impact,
             "Signal": signal
         })
 
@@ -181,99 +198,141 @@ def fetch_usd_reports_last_month():
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    df = df.sort_values("Date", ascending=False)
+    df = df.sort_values("Date", ascending=False).reset_index(drop=True)
     return df
 
+# Streamlit display (insert where needed)
+st.header("📰 USD Makro Fundamenty — Posledních 30 dní (TradingEconomics)")
 
-# ============================================================
-# 2️⃣ SPRÁVNÁ SEASONALITY – průměr měsíčních výkonů za 20 let
-# ============================================================
+fund_df = fetch_te_us_calendar_last_30d()
+if fund_df.empty:
+    st.warning("⚠️ Za posledních 30 dní nebyly nalezeny validní US makro události (nebo API neodpovědělo).")
+else:
+    # colorize signal
+    def sig_style(x):
+        if x > 0: return '🔺 +1'
+        if x < 0: return '🔻 -1'
+        return '⏺ 0'
 
-def get_seasonality_proper(symbol, years=20):
+    # show dataframe with signal text and numeric column
+    fund_df_display = fund_df.copy()
+    fund_df_display["SignalText"] = fund_df_display["Signal"].apply(sig_style)
+    st.dataframe(fund_df_display[["Date", "Report", "Actual", "Forecast", "Previous", "Impact", "SignalText"]], use_container_width=True)
+
+    total_score = int(fund_df["Signal"].sum())
+    st.subheader(f"📊 Celkové fundamentální skóre (30 dní): **{total_score}**")
+# ===== SEASONALITY — Monthly & Weekly (proper agr.) =====
+import yfinance as yf
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+def seasonality_monthly_proper(symbol, years=20):
+    """
+    For each year, compute monthly returns as: (last_close_of_month / last_close_of_prev_month - 1)
+    Then average these monthly returns across years -> monthly seasonality (percent).
+    """
     df = yf.Ticker(symbol).history(period=f"{years}y")
-
     if df.empty:
         return pd.DataFrame()
 
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
     df["Year"] = df.index.year
     df["Month"] = df.index.month
 
-    # poslední close každý měsíc
+    # get last close per (Year,Month)
     monthly = df["Close"].groupby([df["Year"], df["Month"]]).last().reset_index()
-
-    # měsíční změna
+    # compute pct change within same year (month vs previous month)
     monthly["Return"] = monthly.groupby("Year")["Close"].pct_change() * 100
-
-    # odstranit první měsíc roku (nemá předchozí hodnotu)
     monthly = monthly.dropna()
-
-    # 20letý průměr pro každý měsíc
+    # average across years
     season = monthly.groupby("Month")["Return"].mean().reset_index()
-
-    season["Month"] = season["Month"].map({
-        1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
-        7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"
-    })
-
+    # fill month names
+    season["MonthName"] = season["Month"].map({1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"})
+    season = season.sort_values("Month")
     return season
 
+def seasonality_weekly_proper(symbol, years=20):
+    """
+    For each year, compute weekly returns using ISO week numbers:
+    - take last close of each ISO-week within a given year
+    - compute pct change week-over-week within the same year
+    - average the weekly returns for each week number across years (1..53)
+    """
+    df = yf.Ticker(symbol).history(period=f"{years}y")
+    if df.empty:
+        return pd.DataFrame()
 
-# ============================================================
-# 3️⃣ STREAMLIT — USD FUNDAMENTY
-# ============================================================
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
+    # get ISO year and week
+    isocal = df.index.isocalendar()
+    df["ISO_Year"] = isocal.year
+    df["ISO_Week"] = isocal.week
 
-st.header("📰 USD Makro Fundamenty — Posledních 30 dní")
+    weekly = df["Close"].groupby([df["ISO_Year"], df["ISO_Week"]]).last().reset_index()
+    weekly["Return"] = weekly.groupby("ISO_Year")["Close"].pct_change() * 100
+    weekly = weekly.dropna()
 
-cal = fetch_usd_reports_last_month()
+    # average across years by ISO_Week
+    wk = weekly.groupby("ISO_Week")["Return"].mean().reset_index()
+    wk = wk.sort_values("ISO_Week")
+    return wk
 
-if cal.empty:
-    st.warning("⚠️ Žádná makro data za posledních 30 dní nejsou k dispozici.")
-else:
-    st.dataframe(
-        cal,
-        use_container_width=True,
-        column_config={
-            "Signal": st.column_config.NumberColumn(
-                "Signal",
-                help="Bullish = +1, Neutral = 0, Bearish = -1",
-                format="%d"
-            )
-        }
-    )
+def seasonality_heatmap_months(symbol, years=20):
+    df = yf.Ticker(symbol).history(period=f"{years}y")
+    if df.empty:
+        return pd.DataFrame()
+    df.index = pd.to_datetime(df.index)
+    df["Year"] = df.index.year
+    df["Month"] = df.index.month
+    monthly = df["Close"].groupby([df["Year"], df["Month"]]).last().reset_index()
+    monthly["Return"] = monthly.groupby("Year")["Close"].pct_change() * 100
+    monthly = monthly.dropna()
+    pivot = monthly.pivot(index="Year", columns="Month", values="Return").fillna(0)
+    # reorder columns 1..12
+    pivot = pivot[sorted(pivot.columns)]
+    # convert numeric month to names
+    pivot.columns = [ {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}[c] for c in pivot.columns ]
+    return pivot
 
-    score = cal["Signal"].sum()
-    st.subheader(f"📊 Celkové fundamentální skóre: **{score}**")
+def display_seasonality_block(symbol, title):
+    st.subheader(title)
+    m = seasonality_monthly_proper(symbol)
+    if m.empty:
+        st.write("Data not available for symbol:", symbol)
+        return
 
+    # Line chart (months)
+    fig_line = px.line(m, x="MonthName", y="Return", markers=True, title=f"{title} — Monthly Seasonality (avg % change)")
+    st.plotly_chart(fig_line, use_container_width=True)
 
-# ============================================================
-# 4️⃣ STREAMLIT — SEASONALITY (DXY, Gold, S&P500)
-# ============================================================
+    # Heatmap months × years
+    heat = seasonality_heatmap_months(symbol)
+    if not heat.empty:
+        fig_heat = px.imshow(heat.T, aspect="auto", origin="lower", labels=dict(x="Year", y="Month", color="% Return"),
+                            x=heat.index.astype(str), y=list(heat.columns), title=f"{title} — Monthly Returns Heatmap (each year)")
+        st.plotly_chart(fig_heat, use_container_width=True)
 
-st.header("📈 Seasonality — 20letá průměrná měsíční výkonnost")
+    # Weekly
+    wk = seasonality_weekly_proper(symbol)
+    if not wk.empty:
+        fig_wk = px.line(wk, x="ISO_Week", y="Return", markers=True, title=f"{title} — Weekly Seasonality (avg % change by ISO week)")
+        st.plotly_chart(fig_wk, use_container_width=True)
 
-# --- DXY ---
-dxy = get_seasonality_proper("DX-Y.NYB")
-fig_dxy = px.line(
-    dxy, x="Month", y="Return", markers=True,
-    title="DXY Seasonality (20 let – správný výpočet)",
-)
-st.plotly_chart(fig_dxy, use_container_width=True)
+    # Ranking top months
+    top_months = m[["MonthName", "Return"]].sort_values("Return", ascending=False).reset_index(drop=True)
+    top_months.index = top_months.index + 1
+    st.markdown("**Top months (average monthly return)**")
+    st.table(top_months.head(6).rename(columns={"MonthName":"Month","Return":"Avg % Return"}))
 
-# --- GOLD ---
-gold = get_seasonality_proper("GC=F")
-fig_gold = px.line(
-    gold, x="Month", y="Return", markers=True,
-    title="Gold Seasonality (20 let – správný výpočet)",
-)
-st.plotly_chart(fig_gold, use_container_width=True)
+# Insert display calls where you want seasonality shown:
+st.header("📈 Seasonality — DXY, Gold, S&P500 (monthly & weekly)")
+display_seasonality_block("DX-Y.NYB", "DXY (Dollar Index)")
+display_seasonality_block("GC=F", "Gold (XAU/USD)")
+display_seasonality_block("^GSPC", "S&P 500 (SPX)")
 
-# --- S&P500 ---
-spx = get_seasonality_proper("^GSPC")
-fig_spx = px.line(
-    spx, x="Month", y="Return", markers=True,
-    title="S&P 500 Seasonality (20 let – správný výpočet)",
-)
-st.plotly_chart(fig_spx, use_container_width=True)
 
 # FOOTER
 st.caption("Dashboard v.2.0 — Base version (bez fundamentů)")
