@@ -97,153 +97,146 @@ with col2:
 
 
 # ========= PLACE FOR FUNDAMENTS + SEASONALITY =========
-# ============================================================
-# USD FUNDAMENTY — EconDB API (funguje bez API klíče)
-# ============================================================
-import streamlit as st
-import pandas as pd
 import requests
+import pandas as pd
+import streamlit as st
 from datetime import datetime, timedelta
 
 
-ECONDB_SERIES = {
-    "NFP": "NFP",
-    "CPI YoY": "CPIAUCSL",
-    "Core CPI YoY": "CPILFESL",
-    "PPI YoY": "PPIACO",
-    "ISM Manufacturing PMI": "NAPM",
-    "Unemployment Rate": "UNRATE",
-    "Initial Jobless Claims": "ICSA"
-}
+def fetch_tradingview_high_impact():
+    # ONLY HIGH-IMPACT + USA
+    url = "https://economic-calendar.tradingview.com/events?importance=3&filter=country%3Dunited_states"
 
-
-def fetch_econdb_series(series_code):
-    """
-    Returns latest 3 observations of a macro series from EconDB.
-    """
-    url = f"https://www.econdb.com/api/series/{series_code}/?format=json"
     try:
-        r = requests.get(url, timeout=15)
-        if r.status_code != 200:
-            return None
+        r = requests.get(url, timeout=10)
         data = r.json()
     except:
-        return None
+        return pd.DataFrame()
 
-    try:
-        df = pd.DataFrame({
-            "date": data["dates"],
-            "value": data["values"]
-        })
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date", ascending=False)
-        return df.head(3)
-    except:
-        return None
+    if "events" not in data:
+        return pd.DataFrame()
 
-
-def build_usd_macro_table():
     rows = []
+    for event in data["events"]:
+        try:
+            name = event.get("event", None)
+            country = event.get("country", None)
+            actual = event.get("actual", None)
+            forecast = event.get("forecast", None)
+            previous = event.get("previous", None)
+            timestamp = event.get("timestamp", None)
 
-    for label, series in ECONDB_SERIES.items():
-        df = fetch_econdb_series(series)
-        if df is None or len(df) < 2:
+            if country != "United States":
+                continue
+
+            if timestamp:
+                date = datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d")
+            else:
+                date = None
+
+            # Sentiment score
+            if actual is not None and forecast is not None:
+                if actual > forecast:
+                    signal = 1
+                elif actual < forecast:
+                    signal = -1
+                else:
+                    signal = 0
+            else:
+                signal = 0
+
+            rows.append({
+                "Date": date,
+                "Report": name,
+                "Actual": actual,
+                "Forecast": forecast,
+                "Previous": previous,
+                "Signal": signal
+            })
+        except:
             continue
 
-        actual = df.iloc[0]["value"]
-        previous = df.iloc[1]["value"]
-        date = df.iloc[0]["date"].strftime("%Y-%m-%d")
-
-        # Forecast bohužel EconDB neobsahuje → simulujeme forecast = previous
-        forecast = previous
-
-        if actual > forecast:
-            signal = 1
-        elif actual < forecast:
-            signal = -1
-        else:
-            signal = 0
-
-        rows.append({
-            "Date": date,
-            "Report": label,
-            "Actual": actual,
-            "Forecast": forecast,
-            "Previous": previous,
-            "Signal": signal
-        })
-
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    return df
 
 
-# ==== STREAMLIT VÝSTUP ====
+# =========== STREAMLIT OUTPUT ===============
 
-st.header("📰 USD Makro Fundamenty — poslední data (EconDB)")
+st.header("📰 USD Makro Fundamenty — High Impact (TradingView)")
 
-fund = build_usd_macro_table()
+fund = fetch_tradingview_high_impact()
 
 if fund.empty:
-    st.warning("⚠️ Nepodařilo se načíst makro data z EconDB.")
+    st.warning("⚠️ Nepodařilo se načíst data z TradingView API.")
 else:
-    def sig_label(v):
-        if v > 0: return "🔺 +1"
-        if v < 0: return "🔻 -1"
-        return "⏺ 0"
+    fund = fund.sort_values("Date", ascending=False)
 
-    fund["Signal Label"] = fund["Signal"].apply(sig_label)
+    fund["Signal Label"] = fund["Signal"].map({
+        1: "🔺 +1 (Bullish)",
+        0: "⏺ 0 (Neutral)",
+        -1: "🔻 -1 (Bearish)"
+    })
 
     st.dataframe(
         fund[["Date", "Report", "Actual", "Forecast", "Previous", "Signal Label"]],
         use_container_width=True
     )
 
-    total_score = fund["Signal"].sum()
-    st.subheader(f"📊 Celkové USD Fundamentální Skóre: **{total_score}**")
-# ============================================================
-# SEASONALITY — monthly line chart + heatmap (20 let)
-# ============================================================
+    total = fund["Signal"].sum()
+    st.subheader(f"📊 Celkové USD Fundamentální Skóre: **{total}**")
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+MONTH_ORDER = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+MONTH_MAP = {
+    1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
+    7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"
+}
 
 def seasonality_monthly(symbol, years=20):
     df = yf.Ticker(symbol).history(period=f"{years}y")
     if df.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
     df.index = pd.to_datetime(df.index)
     df["Year"] = df.index.year
     df["Month"] = df.index.month
 
+    # last monthly close
     monthly = df["Close"].groupby([df["Year"], df["Month"]]).last().reset_index()
+
+    # monthly returns relative to previous month
     monthly["Return"] = monthly.groupby("Year")["Close"].pct_change() * 100
     monthly = monthly.dropna()
 
-    monthly["MonthName"] = monthly["Month"].map({
-        1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
-        7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"
-    })
+    # map month names
+    monthly["MonthName"] = monthly["Month"].map(MONTH_MAP)
 
-    # 20 yr average
+    # Ensure all 12 months exist even if they have NaN
+    all_months = pd.DataFrame({"Month": list(range(1,13))})
+    all_months["MonthName"] = all_months["Month"].map(MONTH_MAP)
+
     mean_monthly = (
         monthly.groupby("Month")[["Return"]]
         .mean()
         .reset_index()
+        .merge(all_months, on="Month", how="right")
         .sort_values("Month")
     )
-    mean_monthly["MonthName"] = mean_monthly["Month"].map({
-        1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
-        7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"
-    })
+
     return mean_monthly, monthly
 
 
 def seasonality_heatmap(monthly_df):
-    pivot = monthly_df.pivot(index="Year", columns="MonthName", values="Return")
-    pivot = pivot.fillna(0)
-    return pivot
+    heat = monthly_df.pivot(index="Year", columns="MonthName", values="Return")
+
+    # Reorder months correctly
+    heat = heat.reindex(columns=MONTH_ORDER)
+
+    return heat
 
 
 def render_seasonality(symbol, title):
@@ -251,14 +244,15 @@ def render_seasonality(symbol, title):
 
     mean_monthly, monthly_full = seasonality_monthly(symbol)
 
-    # Line chart
+    # Line chart (12 months, ordered)
     fig_line = px.line(
         mean_monthly,
         x="MonthName",
         y="Return",
         markers=True,
-        title=f"{title} — Average Monthly Seasonality (20Y)",
-        labels={"Return": "% Avg Return"}
+        category_orders={"MonthName": MONTH_ORDER},
+        title=f"{title} — Avg Monthly Seasonality (20Y)",
+        labels={"Return": "% Average Monthly Return"}
     )
     st.plotly_chart(fig_line, use_container_width=True)
 
@@ -267,18 +261,17 @@ def render_seasonality(symbol, title):
     fig_hm = px.imshow(
         heat.T,
         aspect="auto",
-        labels=dict(x="Year", y="Month", color="% Return"),
-        title=f"{title} — Heatmap (20Y)"
+        title=f"{title} — Heatmap (20Y)",
+        labels=dict(x="Year", y="Month", color="% Return")
     )
     st.plotly_chart(fig_hm, use_container_width=True)
 
 
-# ===== DISPLAY =====
-st.header("📈 Seasonality — DXY / Gold / S&P500")
+st.header("📈 Seasonality — DXY / XAU / S&P 500 (20Y)")
 
-render_seasonality("DX-Y.NYB", "DXY (Dollar Index)")
+render_seasonality("DX-Y.NYB", "DXY (US Dollar Index)")
 render_seasonality("GC=F", "Gold (XAU/USD)")
-render_seasonality("^GSPC", "S&P 500 (SPX)")
+render_seasonality("^GSPC", "S&P 500 Index")
 
 # FOOTER
 st.caption("Dashboard v.2.0 — Base version (bez fundamentů)")
