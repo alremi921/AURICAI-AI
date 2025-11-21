@@ -230,6 +230,5 @@ fig = px.bar(
 )
 st.plotly_chart(fig, use_container_width=True)
 
-
 # FOOTER
 st.caption("Dashboard v.2.0 — Base version (bez fundamentů)")
