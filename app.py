@@ -93,74 +93,27 @@ div[data-testid="stAlert"] svg {{
 }}
 
 
-/* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
+/* *** Cílení na PANDAS STYLER pro tmavé tabulky (Metoda st.table) *** */
 
-/* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ A STÍNŮ */
-div[data-testid*="stTable"] *, 
-div[data-testid*="stDataFrame"] * {{
-    border-radius: 0 !important;
-    box-shadow: none !important; 
-    outline: none !important;
-}}
-
-/* 2. Cílení na hlavní Streamlit kontejnery pro ZVĚTŠENÍ "původního pole" a odstranění vnějších borderů */
-div[data-testid*="stTable"], 
-div[data-testid*="stDataFrame"] {{
-    box-shadow: none !important; 
-    border: none !important;
-    outline: none !important;
-    background-color: {BG_BLACK} !important;
-    padding: 0 !important; /* Odstraní vnitřní odsazení kontejneru */
-    margin: 0 !important;
-    overflow: visible !important; /* Povolí tabulce přesahovat vnější kontejner */
-}}
-
-/* 3. Poslední záchranná brzda proti zaoblení na okrajích, které by mohlo být stínem */
-div[data-testid="stTable"] > div,
-div[data-testid="stDataFrame"] > div {{
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
-}}
-
-
-/* 4. Cílení na samotné buňky a tělo tabulky */
-/* POZNÁMKA: st.dataframe používá primárně interní styly, proto cílíme na vnitřní třídy */
-div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
-    width: 100% !important; 
-    table-layout: auto; 
-    border-collapse: collapse;
-}}
-
-/* ------------------- STYLING st.dataframe - ZÁSADNÍ OPRAVA BAREV ------------------- */
-
-/* Všechny datové buňky a hlavičky (primární cílení) */
-div[data-testid="stDataFrame"] div[role="gridcell"],
-div[data-testid="stDataFrame"] div[role="columnheader"]
-{{
-    background-color: {BG_BLACK} !important;
-    color: {TEXT_CREAM} !important; 
-    border: 1px solid {TEXT_CREAM} !important; /* Mírnější border pro lepší čitelnost */
-    border-radius: 0 !important;
+/* ZAJIŠTĚNÍ ČITELNOSTI TEXTU V TABULKÁCH (vše krémové, text černý - STABILNÍ VERZE BEZ STYLE APLLY) */
+.dark-table table thead th, 
+.dark-table table tbody td,
+.dark-table table thead th > div, 
+.dark-table table tbody td > div {{
+    background-color: {BG_BLACK} !important; 
+    color: {TEXT_CREAM} !important; /* KRITICKÉ: KRÉMOVÝ TEXT NA ČERNÉM POZADÍ */
+    border: 1px solid {TEXT_CREAM} !important; 
+    border-radius: 0px !important;
     box-shadow: none !important;
 }}
-
-/* Zajištění, že tabulkové kontejnery uvnitř st.dataframe mají tmavé pozadí */
-div[data-testid="stDataFrame"] .data-row,
-div[data-testid="stDataFrame"] .col-header-row {{
+.dark-table table {{
     background-color: {BG_BLACK} !important;
-    color: {TEXT_CREAM} !important;
+    border-radius: 0px !important;
+    border: none !important;
 }}
-
-/* Cílení na div, který drží text uvnitř buňky (pro jistotu, že je text krémový) */
-div[data-testid="stDataFrame"] [data-baseweb="table-cell"] > div {{
-    color: {TEXT_CREAM} !important;
-}}
-
 
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
-div[data-testid="stTable"] table th {{
+.dark-table table th {{
     white-space: nowrap !important;
 }}
 
@@ -335,11 +288,8 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     return summary
 
 # --- FUNKCE PRO STYLOVÁNÍ DATAFRAMU (BEZ BAREVNÉHO ROZLIŠENÍ) ---
-# Nyní zajišťuje pouze ostré hrany a vynucuje BG_BLACK/TEXT_CREAM na každé buňce.
+# Tato funkce je pro st.dataframe nepotřebná, ale zůstává pro konzistenci
 def highlight_points_and_style_text(val):
-    # Pro st.dataframe se stylování buňky řeší jinak nebo se používá globální CSS.
-    # Tato funkce není pro st.dataframe nutná, ponecháme ji pro konzistenci
-    # ale vrátíme prázdný řetězec, protože se na st.dataframe nepoužije.
     return ""
 
 # --- POMOCNÁ FUNKCE PRO SEZONNOST (DXY MOCK DATA) ---
@@ -364,6 +314,17 @@ def generate_dxy_seasonality_data():
     df['Month_Index'] = df['Month'].map(month_to_index)
     return df.set_index('Month_Index').sort_values('Month_Index')
 # -----------------------------------------------------
+
+# Definuje Pandas Styler pro tmavé pozadí a krémový text
+dark_styler = [
+    {'selector': 'th, td',
+     'props': [('background-color', BG_BLACK), 
+               ('color', TEXT_CREAM),
+               ('border', f'1px solid {TEXT_CREAM}'),
+               ('border-radius', '0')]},
+    {'selector': 'table',
+     'props': [('border-collapse', 'collapse')]}
+]
 
 # -------------------------
 # BUILD DASHBOARD
@@ -407,20 +368,6 @@ cols = st.columns(2)
 category_frames = {}
 unique_categories = df_all_display["Category"].unique() 
 
-# Konfigurace sloupců pro st.dataframe pro správné formátování a zarovnání
-column_config = {
-    "Points": st.column_config.NumberColumn(
-        "Points",
-        format="%+d",
-        help="Skóre: +1 lepší než F, -1 horší než F, 0 shoda"
-    ),
-    "DateDisplay": "Date",
-    "Actual": st.column_config.TextColumn("Actual"),
-    "Forecast": st.column_config.TextColumn("Forecast"),
-    "Previous": st.column_config.TextColumn("Previous"),
-}
-
-
 for i, cat in enumerate(unique_categories):
     cat_df_display = df_all_display[df_all_display["Category"] == cat].copy()
     if cat_df_display.empty: continue 
@@ -434,16 +381,21 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
+    # *** KLÍČOVÁ ZMĚNA: Použití st.table s Pandas Styler (pro spolehlivé barvy a skrytí indexu) ***
+    styled_df = display_df.style.set_table_styles(dark_styler).hide(axis="index")
+
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            # *** KLÍČOVÁ ZMĚNA: Použití st.dataframe s hide_index=True ***
-            st.dataframe(display_df, hide_index=True, column_config=column_config, use_container_width=True)
+            st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+            st.table(styled_df)
+            st.markdown('</div>', unsafe_allow_html=True)
     else:
         with cols[1]:
             st.subheader(cat)
-            # *** KLÍČOVÁ ZMĚNA: Použití st.dataframe s hide_index=True ***
-            st.dataframe(display_df, hide_index=True, column_config=column_config, use_container_width=True)
+            st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+            st.table(styled_df)
+            st.markdown('</div>', unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
 
@@ -473,17 +425,13 @@ if final_score >= 2: final_label = "BULLISH"
 elif final_score <= -2: final_label = "BEARISH"
 else: final_label = "NEUTRAL"
 
-# Konfigurace sloupců pro souhrnnou tabulku
-summary_column_config = {
-    "Total Points": st.column_config.NumberColumn(
-        "Total Points",
-        format="%+d"
-    )
-}
+# *** KLÍČOVÁ ZMĚNA: Použití st.table s Pandas Styler (pro spolehlivé barvy a skrytí indexu) ***
+styled_summary = summary_df.style.set_table_styles(dark_styler).hide(axis="index").format({"Total Points":"{:+d}"})
 
 # Zobrazení souhrnné tabulky
-# *** KLÍČOVÁ ZMĚNA: Použití st.dataframe s hide_index=True ***
-st.dataframe(summary_df, hide_index=True, column_config=summary_column_config, use_container_width=True) 
+st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+st.table(styled_summary) 
+st.markdown('</div>', unsafe_allow_html=True)
 
 # Podtržení Celkového skóre (bez rámečku, CENTROVÁNO)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
