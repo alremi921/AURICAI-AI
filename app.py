@@ -107,7 +107,8 @@ p, div, label {{
     background-color: {BG_CREAM} !important;
 }}
 
-/* Oprava: Cílení na AI box (st.info) - ZRUŠIT MODROU VÝPLŇ */
+/* *** KRITICKÁ OPRAVA: AI BOX (st.info) - ZRUŠIT MODROU VÝPLŇ *** */
+/* Cílení na vnitřní prvek (background-color) a kontejner (border) */
 div[data-testid="stAlert"] {{
     background-color: {BG_BLACK} !important; /* Pozadí stejné jako sekce */
     border: 1px solid #4A4A99 !important; /* Jemný modrý obrys */
@@ -115,6 +116,14 @@ div[data-testid="stAlert"] {{
     padding: 20px;
     margin-top: 10px;
 }}
+/* Cílení na Streamlit info box, kde je primární modrá barva */
+div[data-testid="stAlert"] div[role="alert"] {{
+    background-color: {BG_BLACK} !important; /* Zajišťujeme, že modrá primární barva je přepsána */
+}}
+div[data-testid="stAlert"] svg {{
+    fill: {TEXT_CREAM} !important; /* Barva ikony */
+}}
+
 
 /* Centrování Celkového skóre */
 .score-line {{
@@ -220,12 +229,12 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 def color_points_basic(val):
     val = pd.to_numeric(val, errors='coerce')
     # Ostré krémové buňky
-    style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK};' 
+    style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};' 
     if val > 0:
         # Použijeme bílou barvu textu jen pro barevné skóre, jinak krémovou
-        style = 'background-color: #38761d; color: white' 
+        style = 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
     elif val < 0:
-        style = 'background-color: #cc0000; color: white'
+        style = 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
     return style
 
 # -------------------------
@@ -271,21 +280,28 @@ for i, cat in enumerate(unique_categories):
     category_frames[cat] = cat_df_scored
 
     cat_df_display = cat_df_display.sort_values("DateParsed", ascending=False)
+    # Změna: Odebereme sloupec 'Points' z dat, aby ho mohlo stylovat Pandas
     display_df = cat_df_display[["DateDisplay", "Report", "Actual", "Forecast", "Previous", "Points"]].rename(
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Stylování bodů
+    # Stylování bodů: Použijeme st.table pro jednotný design
+    # Stylování buňek se aplikuje na celý DataFrame
+    # Je to nutné pro to, aby se design přenesl do st.table
     styled_df = display_df.style.applymap(color_points_basic, subset=['Points'])
+    
+    # Převod na HTML, abychom mohli použít st.table pro jednotný design
+    # Vzhledem k tomu, že st.table má lepší stylování, použijeme ho
+    display_df_for_table = display_df.copy()
     
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            st.dataframe(styled_df, use_container_width=True)
+            st.table(display_df_for_table.style.applymap(color_points_basic, subset=['Points']))
     else:
         with cols[1]:
             st.subheader(cat)
-            st.dataframe(styled_df, use_container_width=True)
+            st.table(display_df_for_table.style.applymap(color_points_basic, subset=['Points']))
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
 
 # -------------------------
