@@ -93,17 +93,18 @@ div[data-testid="stAlert"] svg {{
 }}
 
 
-/* ZAJIŠTĚNÍ ČITELNOSTI TEXTU V TABULKÁCH (vše krémové, ale text černý) */
+/* ZAJIŠTĚNÍ ČITELNOSTI TEXTU V TABULKÁCH (vše krémové, text černý - STABILNÍ VERZE BEZ STYLE APLLY) */
+/* Vracíme na základní st.table s pevnými barvami, aby se text NEZTRATIL */
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important; /* ZMĚNA: PRIORITA PRO ČITELNÝ TEXT */
+    color: {TEXT_BLACK} !important; /* KRITICKÉ: ČERNÝ TEXT NA KRÉMOVÉM POZADÍ */
     border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
 }}
-/* Nastavení pozadí celého tabulkového kontejneru na krémovou */
 .stTable table {{
     background-color: {BG_CREAM} !important;
 }}
+
 
 /* Centrování Celkového skóre s RÁMEČKEM */
 .score-line-container {{
@@ -151,7 +152,7 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
 .center-div {{
     display: flex;
     justify-content: center;
-    width: 100%; /* Zajištění, že se kontejner roztáhne */
+    width: 100%; 
 }}
 
 </style>
@@ -343,7 +344,7 @@ st.table(summary_df.style.format({"Total Points":"{:+d}"}))
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
-st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</span></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 # AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
