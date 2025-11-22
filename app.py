@@ -95,10 +95,18 @@ div[data-testid="stAlert"] svg {{
 /* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
 /* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
 
-/* 1. Cílení na hlavní kontejner tabulky pro odstranění vnějšího zaoblení */
+/* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ */
+div[data-testid="stTable"], 
+div[data-testid="stDataFrame"],
+div[data-testid="stTable"] > div, 
+div[data-testid="stDataFrame"] > div,
 div[data-testid="stTable"] > div:first-child, 
-div[data-testid="stDataFrame"] > div:first-child {{
+div[data-testid="stDataFrame"] > div:first-child,
+div[data-testid="stTable"] .stTable,
+div[data-testid="stDataFrame"] .stDataFrame
+{{
     border-radius: 0 !important;
+    overflow: hidden; /* Zabrání vykreslení zaoblení, pokud by přetékalo */
 }}
 
 /* 2. Cílení na samotné buňky a tělo tabulky */
@@ -264,11 +272,9 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     return summary
 
 # --- FUNKCE PRO STYLOVÁNÍ DATAFRAMU (BEZ BAREVNÉHO ROZLIŠENÍ) ---
-# Nyní zajišťuje pouze ostré hrany a vynucuje BG_BLACK/TEXT_CREAM na každé buňce, 
-# včetně sloupce Points (kde dříve bylo barevné rozlišení).
+# Nyní zajišťuje pouze ostré hrany a vynucuje BG_BLACK/TEXT_CREAM na každé buňce.
 def highlight_points_and_style_text(row):
     # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
-    # Bez barevného rozlišení pro Points.
     default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; border-radius: 0 !important;'
     styles = [default_style] * len(row)
     
@@ -371,9 +377,9 @@ for cat, df_cat in category_frames.items():
 summary_df = pd.DataFrame(summary_rows)
 final_score = total_combined_score
 
-if final_score >= 2: final_label = "Bullish"
-elif final_score <= -2: final_label = "Bearish"
-else: final_label = "Neutral"
+if final_score >= 2: final_label = "BULLISH"
+elif final_score <= -2: final_label = "BEARISH"
+else: final_label = "NEUTRAL"
 
 # Zobrazení souhrnné tabulky (Bez jakéhokoliv barevného rozlišení)
 styled_summary = summary_df.style.format({"Total Points":"{:+d}"})
