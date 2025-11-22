@@ -24,7 +24,7 @@ CATEGORY_KEYWORDS = {
 }
 
 # -------------------------
-# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA (Old Money Style)
+# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA (Stabilní Old Money Style)
 # -------------------------
 st.markdown(f"""
 <style>
@@ -54,7 +54,7 @@ h1 {{
 h2, h3, h4, .small-title {{
     font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
-    font-weight: 300; /* ZAJIŠTĚNÍ LIGHT VÁHY PRO VŠECHNY NADPISY */
+    font-weight: 300; /* LIGHT VÁHA PRO VŠECHNY NADPISY */
     text-transform: uppercase;
     margin-bottom: 20px; 
 }}
@@ -68,7 +68,7 @@ h2, h3, h4, .small-title {{
 p, div, label {{
     font-family: 'Montserrat', sans-serif !important;
     font-weight: 300; 
-    color: {TEXT_CREAM}; /* Default text color */
+    color: {TEXT_CREAM}; 
 }}
 /* Motto - Libre Baskerville, Uppercase */
 .motto {{
@@ -86,37 +86,22 @@ p, div, label {{
     color: {TEXT_BLACK}; 
 }}
 
-/* ZMĚNA: Stylování Tabulek - NÁVRAT KE STABILNÍMU STYLU st.table */
-.stDataFrame, .stTable {{
-    margin-left: auto;
-    margin-right: auto;
-    border-radius: 0px !important; 
-    border: none !important;
-    background-color: transparent !important;
-}}
-
-/* Cílení na BUŇKY a HLAVIČKY - Zajištění krémového pozadí a ČERNÉHO TEXTU */
-.stDataFrame table thead th, .stDataFrame table tbody td, 
+/* NÁVRAT KE STABILNÍMU STYLU ST.TABLE */
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important; /* KRITICKÁ OPRAVA: Text v tabulkách je černý */
+    color: {TEXT_BLACK} !important; /* ČITELNÝ TEXT */
     border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
 }}
-.stTable table {{
-    background-color: {BG_CREAM} !important;
-}}
-
 
 /* *** KRITICKÁ OPRAVA: AI BOX (st.info) - ZRUŠIT MODROU VÝPLŇ *** */
 div[data-testid="stAlert"] {{
     background-color: {BG_BLACK} !important; 
-    border: 1px solid {TEXT_CREAM} !important; /* Krémový obrys */
+    border: 1px solid {TEXT_CREAM} !important; 
     color: {TEXT_CREAM} !important; 
     padding: 20px;
     margin-top: 10px;
 }}
-/* Potlačení modré barvy ikon a pozadí */
 div[data-testid="stAlert"] div[role="alert"] {{
     background-color: {BG_BLACK} !important; 
 }}
@@ -128,9 +113,9 @@ div[data-testid="stAlert"] svg {{
 /* Centrování Celkového skóre s RÁMEČKEM */
 .score-line-container {{
     padding: 15px;
-    border: 1px solid {TEXT_CREAM}; /* Rámeček kolem skóre */
-    display: inline-block; /* Aby se rámeček obtáčel kolem textu */
-    margin: 20px auto 30px auto; /* Mezery a centrování */
+    border: 1px solid {TEXT_CREAM}; 
+    display: inline-block; 
+    margin: 20px auto 30px auto; 
     text-align: center;
 }}
 .score-line {{
@@ -158,13 +143,17 @@ div[data-testid="stAlert"] svg {{
     color: {TEXT_CREAM} !important;
 }}
 
-/* Přidání mezer mezi sekce (čisté enter) */
+/* Přidání mezer mezi sekce */
 .section-spacer {{
     height: 30px; 
 }}
 
-/* ZAJIŠTĚNÍ CENTROVÁNÍ VŠECH PRVKŮ VE ST.TABLE A ST.DATAFRAME */
+/* ZAJIŠTĚNÍ CENTROVÁNÍ VŠECH PRVKŮ VE ST.TABLE A ST.DATAFRAME A SKÓRE */
 div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
+    display: flex;
+    justify-content: center;
+}}
+.center-div {{
     display: flex;
     justify-content: center;
 }}
@@ -357,9 +346,8 @@ else: final_label = "Neutral pro USD"
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
-# ZMĚNA: Ohraničení rámečkem
-st.markdown("<div style='display:flex; justify-content:center;'>", unsafe_allow_html=True)
-st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
+st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
+st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</span></div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 # AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
