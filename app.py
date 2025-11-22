@@ -2,29 +2,24 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 import plotly.express as px
+import os # Pro kontrolu existence CSV souboru
 
 st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
-st.title("💵 USD Macro AI Dashboard — Category Scoring (last 6 months)")
+st.title("💵 USD Macro AI Dashboard — Category Scoring (last 6 months, data z CSV)")
 
 # -------------------------
 # CONFIG
 # -------------------------
-# how far back (days) - NÁVRAT na 180 dní (~6 měsíců)
-LOOKBACK_DAYS = 180
+# how far back (days)
+LOOKBACK_DAYS = 180  # ~6 months
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
 
-# endpoints to try (robust)
-JSON_WEEK_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-JSON_CDN = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json"
-XML_WEEK_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
-XML_CDN = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml"
+CSV_FILE_PATH = "usd_macro_history.csv" # NOVÁ CESTA K DATŮM
 
-# KEYWORDS for categories (case-insensitive)
+# KEYWORDS for categories (case-insensitive) - Ponecháme pro budoucí použití, ale nyní je Category brána z CSV
 CATEGORY_KEYWORDS = {
     "Inflace": [
         "cpi", "core cpi", "pce", "core pce", "consumer price", "inflation"
@@ -42,21 +37,12 @@ CATEGORY_KEYWORDS = {
     ]
 }
 
-# helper: map category by title
-def categorize_title(title):
-    t = title.lower()
-    for cat, kws in CATEGORY_KEYWORDS.items():
-        for kw in kws:
-            if kw in t:
-                return cat
-    return None
-
 # helper: clean numeric fields -> float or None
 def clean_num(x):
     if x is None:
         return None
     s = str(x).strip()
-    # Robustní čištění: odstranění tečky na začátku, pokud tam je
+    
     if s.startswith('.'):
          s = s[1:]
     
@@ -69,191 +55,53 @@ def clean_num(x):
     except:
         return None
 
-# Try to fetch weekly JSON (current week)
-def fetch_json(url):
+# NOVÁ FUNKCE: Načtení dat z lokálního CSV
+def load_events_from_csv():
+    if not os.path.exists(CSV_FILE_PATH):
+        st.error(f"Chyba: Soubor s daty '{CSV_FILE_PATH}' nebyl nalezen. Vytvořte jej prosím.")
+        return pd.DataFrame()
+
     try:
-        r = requests.get(url, timeout=20) # Zvýšený timeout
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        return None
-    return None
-
-# Fetch XML and parse events
-def fetch_xml(url):
-    try:
-        r = requests.get(url, timeout=20) # Zvýšený timeout
-        if r.status_code == 200:
-            return r.text
-    except Exception:
-        return None
-    return None
-
-# Parse JSON structure returned by ff_calendar_thisweek.json
-def parse_faireconomy_json(json_data):
-    rows = []
-    if not json_data:
-        return rows
-    # data may be under 'data' or be a list
-    data_list = json_data.get("data") if isinstance(json_data, dict) else json_data
-    if data_list is None:
-        return rows
-    for ev in data_list:
-        try:
-            country = ev.get("country")
-            impact = ev.get("impact", 0)
-            event = ev.get("event") or ev.get("title") or ev.get("summary") or ""
-            ts = ev.get("timestamp")  # unix timestamp (seconds)
-            if ts:
-                dt = datetime.utcfromtimestamp(int(ts))
-                dt_str = dt.strftime("%Y-%m-%d %H:%M")
-            else:
-                dt_str = None
-            rows.append({
-                "Date": dt_str,
-                "Country": country,
-                "Impact": impact,
-                "Report": event,
-                "Actual": ev.get("actual"),
-                "Forecast": ev.get("forecast"),
-                "Previous": ev.get("previous")
-            })
-        except Exception:
-            continue
-    return rows
-
-# Parse XML (ff_calendar_thisweek.xml format)
-def parse_faireconomy_xml(xml_text):
-    rows = []
-    if not xml_text:
-        return rows
-    try:
-        # Vylepšené čištění XML textu
-        xml_text = xml_text.strip()
-        if not xml_text.startswith('<'):
-            xml_text = '<root>' + xml_text.split('<', 1)[1] if '<' in xml_text else xml_text
-            if not xml_text.endswith('>'):
-                 xml_text += '</root>'
-
-        root = ET.fromstring(xml_text)
-    except Exception:
-        return rows
-    
-    for event in root.findall(".//event"):
-        try:
-            title = event.findtext("title") or ""
-            country = event.findtext("country")
-            impact_text = event.findtext("impact")
-            impact = None
-            if impact_text:
-                try:
-                    impact = int(impact_text)
-                except:
-                    impact = {"Low":1,"Medium":2,"High":3}.get(impact_text.strip(), 0)
-            
-            date_text = event.findtext("date") or event.findtext("time") or event.findtext("date_time")
-            dt_str = None
-            if date_text:
-                if date_text.startswith('.'):
-                    date_text = date_text[1:]
-                try:
-                    dt = pd.to_datetime(date_text)
-                    dt_str = dt.strftime("%Y-%m-%d %H:%M")
-                except:
-                    dt_str = date_text
-            
-            ts_node = event.findtext("timestamp")
-            if not dt_str and ts_node:
-                try:
-                    dt = datetime.utcfromtimestamp(int(ts_node))
-                    dt_str = dt.strftime("%Y-%m-%d %H:%M")
-                except:
-                    dt_str = None
-            
-            # PŘIDANÁ KONTROLA: zajištění, že Actual/Forecast jsou správně uchopeny
-            forecast = event.findtext("forecast") or ""
-            actual = event.findtext("actual") or ""
-            previous = event.findtext("previous") or ""
-            
-            rows.append({
-                "Date": dt_str,
-                "Country": country,
-                "Impact": int(impact) if impact is not None else 0,
-                "Report": title,
-                "Actual": actual,
-                "Forecast": forecast,
-                "Previous": previous
-            })
-        except Exception:
-            continue
-    return rows
-
-# Collect events from multiple sources for the last 6 months (weekly crawl)
-def collect_events_6mo():
-    all_rows = []
-
-    # 1) Try the canonical JSON endpoint for current & near weeks
-    for url in (JSON_CDN, JSON_WEEK_URL):
-        j = fetch_json(url)
-        if j:
-            rows = parse_faireconomy_json(j)
-            all_rows.extend(rows)
-
-    # 2) Try XML weekly endpoint
-    for url in (XML_CDN, XML_WEEK_URL):
-        xml_text = fetch_xml(url)
-        if xml_text:
-            rows = parse_faireconomy_xml(xml_text)
-            all_rows.extend(rows)
-
-    # 3) As a robust attempt: iterate backward weekly and try to fetch weekly JSON by passing date param (We'll attempt for up to 26 weeks)
-    weeks = 26
-    for w in range(weeks):
-        target = TODAY - timedelta(weeks=w)
-        # try a few URL templates
-        templates = [
-            f"https://nfs.faireconomy.media/ff_calendar_thisweek.json?date={target.strftime('%Y-%m-%d')}",
-            f"https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json?date={target.strftime('%Y-%m-%d')}",
-            f"https://nfs.faireconomy.media/ff_calendar_thisweek.xml?date={target.strftime('%m.%Y')}",
-            f"https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml?date={target.strftime('%m.%Y')}"
-        ]
+        # Načtení CSV
+        df = pd.read_csv(CSV_FILE_PATH)
         
-        for t in templates:
-            try:
-                if t.endswith(".json") or ".json?" in t:
-                    j = fetch_json(t)
-                    if j:
-                        rows = parse_faireconomy_json(j)
-                        if rows:
-                            all_rows.extend(rows)
-                else:
-                    xml_text = fetch_xml(t)
-                    if xml_text:
-                        rows = parse_faireconomy_xml(xml_text)
-                        if rows:
-                            all_rows.extend(rows)
-            except Exception:
-                continue
-    # deduplicate by Report + Date
-    df = pd.DataFrame(all_rows)
-    if df.empty:
-        return df
-    # normalize Date to datetime when possible
-    df["DateParsed"] = pd.to_datetime(df["Date"], errors="coerce")
-    # only keep within lookback window
-    df = df[df["DateParsed"].notna()]
-    df = df[df["DateParsed"] >= pd.Timestamp(START_DATE)]
-    df = df.sort_values("DateParsed", ascending=False)
-    df = df.drop_duplicates(subset=["Report", "DateParsed"], keep="first").reset_index(drop=True)
-    return df
+        # Přejmenování klíčových sloupců na standardizované názvy (pro kompatibilitu s původní logikou)
+        if 'Date' in df.columns:
+             df["DateParsed"] = pd.to_datetime(df["Date"], errors="coerce")
+        else:
+             st.error("Chyba ve sloupcích CSV: Chybí sloupec 'Date'.")
+             return pd.DataFrame()
+
+        # Filtrace podle časového okna (posledních 6 měsíců)
+        df = df[df["DateParsed"].notna()]
+        df = df[df["DateParsed"] >= pd.Timestamp(START_DATE)]
+        
+        # Filtrace na High Impact (sloupec Impact musí existovat a mít hodnotu 3)
+        if "Impact" in df.columns:
+            df["ImpactNum"] = pd.to_numeric(df["Impact"], errors="coerce").fillna(0).astype(int)
+            df = df[df["ImpactNum"] >= 3].copy()
+        else:
+            # Pokud chybí, předpokládáme, že jsou všechna data v CSV high impact (Impact=3)
+            df["ImpactNum"] = 3
+
+        # Finalizace sloupců
+        df = df.sort_values("DateParsed", ascending=False)
+        return df.reset_index(drop=True)
+    
+    except Exception as e:
+        st.error(f"Nepodařilo se načíst nebo zpracovat soubor CSV. Zkontrolujte formátování. Chyba: {e}")
+        return pd.DataFrame()
+
 
 # Score each event: compare actual vs forecast -> +1 / -1 / 0
 def score_event(row):
     a = clean_num(row.get("Actual"))
     f = clean_num(row.get("Forecast"))
-    # Double check: Skóre bude 0 POUZE, pokud Actual nebo Forecast chybí (None)
+    
+    # Skóre funguje, protože data pochází z CSV a Actual/Forecast jsou zaručeny.
     if a is None or f is None:
-        return 0  # neutral if missing data (PROBLEM)
+        # Mělo by nastat pouze při chybě v zadávání CSV
+        return 0
     if a > f:
         return 1
     if a < f:
@@ -275,28 +123,25 @@ def evaluate_category(df_cat):
 
 # NOVÁ FUNKCE: AI-style vyhodnocení
 def generate_ai_summary(summary_df, final_score, overall_label):
-    summary = f"Celkové fundamentální skóre pro USD za posledních 6 měsíců je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
+    summary = f"Celkové fundamentální skóre pro USD za posledních 6 měsíců (data z CSV) je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
     
     # Seřazení kategorií podle skóre
     sorted_summary = summary_df.sort_values("Total Points", ascending=False)
     
-    # 1. Největší vliv (nejpozitivnější)
     best_cat = sorted_summary.iloc[0]
     if best_cat['Total Points'] > 0:
         summary += f"Nejsilnější pozitivní vliv na USD má kategorie **{best_cat['Category']}** s výsledkem **{best_cat['Total Points']:+d} bodů** ({best_cat['Events Count']} událostí). To značí, že makrodata z této oblasti překonala očekávání trhu. "
     
-    # 2. Nejslabší vliv (nejnegativnější)
     worst_cat = sorted_summary.iloc[-1]
     if worst_cat['Total Points'] < 0:
         summary += f"Negativně působí kategorie **{worst_cat['Category']}** se skóre **{worst_cat['Total Points']:+d} bodů** ({worst_cat['Events Count']} událostí). Zde aktuální výsledky zaostaly za konsenzem. "
     
-    # 3. Celková bilance
     if overall_label == "Bullish pro USD":
         summary += "Fundamentální býčí sentiment je tažen silnými daty z klíčových oblastí, která převážila mírně negativní zprávy. "
     elif overall_label == "Bearish pro USD":
-        summary += "Celková medvědí nálada je způsobena kumulací slabších výsledků, což signalizuje zpomalení nebo překážky pro Fed/Ekonomiku. "
+        summary += "Celková medvědí nálada je způsobena kumulací slabších výsledků. "
     else: # Neutral
-        summary += "Celkový neutralní výsledek poukazuje na vyváženou situaci, kdy se pozitivní a negativní fundamenty navzájem vyrušily. "
+        summary += "Celkový neutralní výsledek poukazuje na vyváženou situaci. "
 
     return summary
 
@@ -305,32 +150,26 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 # BUILD DASHBOARD
 # -------------------------
 st.header("Data fetch & processing")
-with st.spinner(f"Stahuji a zpracovávám ekonomické události (posledních ~{LOOKBACK_DAYS} dní)..."):
-    df_all = collect_events_6mo()
+with st.spinner(f"Načítám data z lokálního souboru '{CSV_FILE_PATH}' (posledních ~{LOOKBACK_DAYS} dní)..."):
+    df_high = load_events_from_csv() # ZMĚNA: Voláme CSV funkci
 
-if df_all.empty:
-    st.error("Nepodařilo se stáhnout žádné události z ekonomického kalendáře. Zkus znovu nebo zkontroluj konektivitu.")
+if df_high.empty:
+    st.error("Nepodařilo se načíst žádná platná data. Zkontrolujte soubor 'usd_macro_history.csv' a jeho formát.")
     st.stop()
 
-# Keep only high impact (impact >=3)
-df_all["ImpactNum"] = pd.to_numeric(df_all["Impact"], errors="coerce").fillna(0).astype(int)
-# If ImpactNum is 0 but title contains 'high', treat as 3
-df_all.loc[(df_all["ImpactNum"] == 0) & (df_all["Report"].str.lower().str.contains("high")), "ImpactNum"] = 3
-df_high = df_all[df_all["ImpactNum"] >= 3].copy()
+# Zajištění, že 'Category' je k dispozici
+if "Category" not in df_high.columns:
+    st.error("Chyba: V souboru CSV chybí sloupec 'Category'. Bodování nelze provést.")
+    st.stop()
 
-# Add Category
-df_high["Category"] = df_high["Report"].apply(lambda r: categorize_title(str(r)) )
-# Keep only events that matched one of our categories
-df_high = df_high[df_high["Category"].notna()].copy()
-
-# Compute Points
+# Compute Points (Zde dojde ke správnému bodování, protože Actual/Forecast jsou v CSV)
 df_high["Points"] = df_high.apply(score_event, axis=1)
 
 # Standardize date string for display
 df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 
 # Show counts
-st.success(f"Nalezeno {len(df_high)} high-impact událostí v cílových kategoriích za posledních {LOOKBACK_DAYS} dní.")
+st.success(f"Nalezeno {len(df_high)} High-Impact událostí v cílových kategoriích za posledních {LOOKBACK_DAYS} dní. Data pochází ze souboru CSV.")
 
 # -------------------------
 # Create per-category tables
@@ -339,17 +178,19 @@ st.header("Tabulky podle témat")
 cols = st.columns(2)
 
 category_frames = {}
-for cat in CATEGORY_KEYWORDS.keys():
+for cat in CATEGORY_KEYWORDS.keys(): # Iterujeme přes definované kategorie
     cat_df = df_high[df_high["Category"] == cat].copy()
-    # sort by date desc
+    
+    if cat_df.empty:
+        # Přeskočit, pokud v dané kategorii nejsou žádná data
+        continue 
+    
     cat_df = cat_df.sort_values("DateParsed", ascending=False)
-    # display minimal columns
     display_df = cat_df[["DateDisplay", "Report", "Actual", "Forecast", "Previous", "Points"]].rename(
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
-    category_frames[cat] = cat_df  # keep original for aggregation
+    category_frames[cat] = cat_df
 
-    # place in UI: 2 columns, alternating
     if list(CATEGORY_KEYWORDS.keys()).index(cat) % 2 == 0:
         with cols[0]:
             st.subheader(cat)
@@ -378,9 +219,7 @@ for cat, df_cat in category_frames.items():
 
 summary_df = pd.DataFrame(summary_rows)
 
-# calculate final combined score: sum of category totals
 final_score = int(summary_df["Total Points"].sum())
-# overall label by user's rule (>2 bullish, <-2 bearish, else neutral)
 if final_score > 2:
     overall_label = "Bullish pro USD"
 elif final_score < -2:
@@ -388,11 +227,9 @@ elif final_score < -2:
 else:
     overall_label = "Neutral pro USD"
 
-# show category summary
 st.subheader("Category summary")
 st.table(summary_df.style.format({"Total Points":"{:+d}"}))
 
-# final row
 st.markdown(f"### 🔎 Celkové fundamentální skóre: **{final_score:+d}** — **{overall_label}**")
 
 # NOVÁ SEKCE: AI Vyhodnocení
@@ -426,14 +263,11 @@ st.markdown("---")
 st.header("Export / download")
 st.markdown("Stáhni data pro další analýzu:")
 
-# full events CSV
 csv_all = df_high.sort_values("DateParsed", ascending=False)[
     ["DateDisplay","Category","Report","Actual","Forecast","Previous","Points"]
 ].rename(columns={"DateDisplay":"Date"})
-st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_6mo.csv", "text/csv")
+st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_6mo_final.csv", "text/csv")
 
-# summary CSV
-st.download_button("Download summary CSV", summary_df.to_csv(index=False).encode("utf-8"), "usd_macro_summary.csv", "text/csv")
+st.download_button("Download summary CSV", summary_df.to_csv(index=False).encode("utf-8"), "usd_macro_summary_final.csv", "text/csv")
 
-st.error("DŮLEŽITÉ: Pokud ani teď nevidíš 'Actual' hodnoty pro starší zprávy, znamená to, že je zdroj dat (API) neposkytuje. V takovém případě je nutné najít jiný, spolehlivější zdroj historických dat.")
-st.success("Hotovo — zkus znovu spustit.")
+st.success(f"Hotovo — Aplikace nyní čte data ze souboru '{CSV_FILE_PATH}'.")
