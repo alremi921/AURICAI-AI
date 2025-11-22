@@ -39,12 +39,11 @@ st.markdown(f"""
 }}
 
 /* 3. Stylování nadpisů */
-/* HLAVNÍ NADPIS: Auricai AI */
 h1 {{
     font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
     color: {TEXT_CREAM};
-    font-weight: 300; /* ZMĚNA: Montserrat Light */
+    font-weight: 300; 
     text-transform: uppercase;
     letter-spacing: 5px;
     margin-top: 10px;
@@ -79,7 +78,7 @@ p, div, label {{
     letter-spacing: 3px;
     margin-top: -10px;
     font-size: 1.1em;
-    text-align: center; /* ZAROVNÁNÍ MOTTA NA STŘED */
+    text-align: center; 
 }}
 
 /* Nastavení barvy textu v krémových sekcích */
@@ -96,11 +95,11 @@ p, div, label {{
     background-color: transparent !important;
 }}
 
-/* Cílení na BUŇKY a HLAVIČKY - Zajištění krémového pozadí */
+/* Cílení na BUŇKY a HLAVIČKY - Zajištění krémového pozadí a ČERNÉHO TEXTU */
 .stDataFrame table thead th, .stDataFrame table tbody td, 
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important;
+    color: {TEXT_BLACK} !important; /* KRITICKÁ OPRAVA: Černý text v krémových buňkách */
     border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
 }}
@@ -126,16 +125,19 @@ div[data-testid="stAlert"] svg {{
 }}
 
 
-/* Centrování Celkového skóre */
-.score-line {{
-    border-bottom: 1px solid {TEXT_CREAM};
-    padding-bottom: 5px;
-    display: block; 
+/* Centrování Celkového skóre s RÁMEČKEM */
+.score-line-container {{
+    padding: 15px;
+    border: 1px solid {TEXT_CREAM}; /* Rámeček kolem skóre */
+    display: inline-block; /* Aby se rámeček obtáčel kolem textu */
+    margin: 20px auto 30px auto; /* Mezery a centrování */
     text-align: center;
+}}
+.score-line {{
     font-size: 1.5em;
     font-weight: 400; 
-    margin-bottom: 30px; 
-    margin-top: 20px; 
+    display: block; 
+    color: {TEXT_CREAM}; 
 }}
 
 /* --- BAREVNÉ SEKCE (Střídavé Pozadí) --- */
@@ -154,6 +156,11 @@ div[data-testid="stAlert"] svg {{
 }}
 .section-black h2, .section-black h3, .section-black h4 {{
     color: {TEXT_CREAM} !important;
+}}
+
+/* Přidání mezer mezi sekce (čisté enter) */
+.section-spacer {{
+    height: 30px; 
 }}
 
 </style>
@@ -221,7 +228,7 @@ def evaluate_category(df_cat):
     else: label = "Neutral"
     return total, label
 
-# ZMĚNA: ZKRÁCENÉ AI shrnutí (cca 3-4 věty)
+# ZKRÁCENÉ AI shrnutí (cca 3-4 věty)
 def generate_ai_summary(summary_df, final_score, overall_label):
     
     strongest = summary_df.sort_values('Total Points', ascending=False).iloc[0]
@@ -278,6 +285,7 @@ df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 df_scored = df_high[pd.to_numeric(df_high['Actual'], errors='coerce').notna()].copy()
 df_all_display = df_high.copy()
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
+st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
 
 # -------------------------
 # 3. ROZDĚLENÍ FUNDAMENTÁLNÍCH ZPRÁV DO KATEGORIÍ (Sekce #F2EEDB)
@@ -311,6 +319,7 @@ for i, cat in enumerate(unique_categories):
             st.subheader(cat)
             st.table(display_df.style.applymap(color_points_basic, subset=['Points']))
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
+st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
 
 # -------------------------
 # 4. VYHODNOCENÍ FUNDAMENTU A AI ANALÝZA (Sekce #0C0C0C)
@@ -342,14 +351,17 @@ else: final_label = "Neutral pro USD"
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
-st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</div>", unsafe_allow_html=True)
+# ZMĚNA: Ohraničení rámečkem
+st.markdown("<div style='display:flex; justify-content:center;'>", unsafe_allow_html=True)
+st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
 st.subheader("AI Fundamentální Vyhodnocení")
 ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
-# Použití st.info s upraveným CSS pro stylizovaný box bez modrého pozadí
 st.info(ai_text_content)
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
+st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
 
 # -------------------------
 # 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ (Sekce #0C0C0C)
@@ -376,6 +388,7 @@ if not viz_agg.empty:
 else:
     st.info("Není dost dat pro graf.")
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
+st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
     
 # -------------------------
 # 6. Export (Sekce #0C0C0C)
