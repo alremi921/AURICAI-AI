@@ -126,47 +126,38 @@ div[data-testid="stDataFrame"] > div {{
 
 
 /* 4. Cílení na samotné buňky a tělo tabulky */
-/* POZNÁMKA: st.dataframe používá primárně interní styly, ale toto pomáhá */
+/* POZNÁMKA: st.dataframe používá primárně interní styly, proto cílíme na vnitřní třídy */
 div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
     width: 100% !important; 
     table-layout: auto; 
     border-collapse: collapse;
 }}
-/* Zajištění viditelnosti hran - zvýšení tloušťky border */
-div[data-testid="stTable"] table th, 
-div[data-testid="stTable"] table td,
-div[data-testid="stDataFrame"] table th,
-div[data-testid="stDataFrame"] table td
+
+/* ------------------- STYLING st.dataframe ------------------- */
+
+/* Všechny buňky (data, hlavičky, řádky) */
+div[data-testid="stDataFrame"] div[role="gridcell"],
+div[data-testid="stDataFrame"] div[role="columnheader"]
 {{
     background-color: {BG_BLACK} !important;
     color: {TEXT_CREAM} !important; 
-    border: 2px solid {TEXT_CREAM}; /* ZVÝŠENÍ TLOUŠŤKY BORDERU */
-    border-radius: 0 !important; /* Vynucení ostrých hran na buňkách */
+    border: 2px solid {TEXT_CREAM} !important; /* Vynucení viditelných hran */
+    border-radius: 0 !important;
     box-shadow: none !important;
 }}
-div[data-testid="stTable"] table th {{
-    border-bottom: 2px solid {TEXT_CREAM} !important; /* Zajištění oddělení hlavičky */
-}}
 
+/* Hlavičky sloupců */
+div[data-testid="stDataFrame"] .col-header-row div[role="columnheader"] {{
+    background-color: {BG_BLACK} !important;
+    color: {TEXT_CREAM} !important;
+    border: 2px solid {TEXT_CREAM} !important;
+    border-radius: 0 !important;
+}}
 
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
 div[data-testid="stTable"] table th {{
     white-space: nowrap !important;
 }}
-
-/* Nastavení stylů pro st.dataframe (aby vypadalo jako naše černo-krémová tabulka) */
-div[data-testid="stDataFrame"] .row-header {{
-    background-color: {BG_BLACK} !important;
-    color: {TEXT_CREAM} !important;
-    border-radius: 0 !important;
-}}
-div[data-testid="stDataFrame"] .col-header {{
-    background-color: {BG_BLACK} !important;
-    color: {TEXT_CREAM} !important;
-    border-radius: 0 !important;
-    border: 2px solid {TEXT_CREAM} !important;
-}}
-
 
 /* Centrování Celkového skóre (bez rámečku) */
 .score-line-container {{
