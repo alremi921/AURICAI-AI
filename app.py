@@ -91,11 +91,12 @@ p, div, label {{
     margin-right: auto;
     border-radius: 0px !important; /* Ostré rohy */
     border: none !important;
-    /* Zajistíme, aby pozadí celého kontejneru pro tabulky nebylo černé */
     background-color: transparent !important;
 }}
-/* Cílení na buňky a hlavičky tabulky pro krémovou barvu a ostré rohy */
-.stDataFrame table thead th, .stDataFrame table tbody td, .stTable table thead th, .stTable table tbody td {{
+
+/* Cílení na BUŇKY a HLAVIČKY - Dělá tabulky krémové a ostré */
+.stDataFrame table thead th, .stDataFrame table tbody td, 
+.stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
     color: {TEXT_BLACK} !important;
     border: 1px solid {TEXT_BLACK}; /* Čisté ostré rozdělení */
@@ -106,7 +107,7 @@ p, div, label {{
     background-color: {BG_CREAM} !important;
 }}
 
-/* Oprava: Cílení na AI box (st.info) - ZRUŠIT MODROU BARVU */
+/* Oprava: Cílení na AI box (st.info) - ZRUŠIT MODROU VÝPLŇ */
 div[data-testid="stAlert"] {{
     background-color: {BG_BLACK} !important; /* Pozadí stejné jako sekce */
     border: 1px solid #4A4A99 !important; /* Jemný modrý obrys */
@@ -218,11 +219,14 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 # Funkce pro stylování Pandas DataFrame
 def color_points_basic(val):
     val = pd.to_numeric(val, errors='coerce')
+    # Ostré krémové buňky
+    style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK};' 
     if val > 0:
-        return 'background-color: #38761d; color: white' 
+        # Použijeme bílou barvu textu jen pro barevné skóre, jinak krémovou
+        style = 'background-color: #38761d; color: white' 
     elif val < 0:
-        return 'background-color: #cc0000; color: white'
-    return 'background-color: #3d85c6; color: white'
+        style = 'background-color: #cc0000; color: white'
+    return style
 
 # -------------------------
 # BUILD DASHBOARD
