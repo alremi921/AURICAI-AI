@@ -96,7 +96,7 @@ div[data-testid="stAlert"] svg {{
 /* ZAJIŠTĚNÍ ČITELNOSTI TEXTU V TABULKÁCH (vše krémové, ale text černý) */
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important; 
+    color: {TEXT_BLACK} !important; /* ZMĚNA: PRIORITA PRO ČITELNÝ TEXT */
     border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
 }}
@@ -151,6 +151,7 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
 .center-div {{
     display: flex;
     justify-content: center;
+    width: 100%; /* Zajištění, že se kontejner roztáhne */
 }}
 
 </style>
