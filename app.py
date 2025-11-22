@@ -24,7 +24,7 @@ CATEGORY_KEYWORDS = {
 }
 
 # -------------------------
-# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA (Stabilní Old Money Style)
+# ZÁKLADNÍ CSS PRO STABILITU A DESIGN
 # -------------------------
 st.markdown(f"""
 <style>
@@ -38,29 +38,19 @@ st.markdown(f"""
     color: {TEXT_CREAM};
 }}
 
-/* 3. Stylování nadpisů */
-h1 {{
+/* 3. Stylování nadpisů (Montserrat Light, Uppercase) */
+h1, h2, h3, h4, .small-title {{
     font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
     color: {TEXT_CREAM};
     font-weight: 300; 
     text-transform: uppercase;
-    letter-spacing: 5px;
+    letter-spacing: 3px;
     margin-top: 10px;
-    margin-bottom: 5px;
-    font-size: 2.5em;
-}}
-/* MALÝ HORNÍ NADPIS A OSTATNÍ NADPISY */
-h2, h3, h4, .small-title {{
-    font-family: 'Montserrat', sans-serif !important; 
-    text-align: center;
-    font-weight: 300; /* LIGHT VÁHA PRO VŠECHNY NADPISY */
-    text-transform: uppercase;
-    margin-bottom: 20px; 
+    margin-bottom: 20px;
 }}
 .small-title {{
     font-size: 0.9em;
-    color: {TEXT_CREAM};
     margin-bottom: 10px;
 }}
 
@@ -68,7 +58,7 @@ h2, h3, h4, .small-title {{
 p, div, label {{
     font-family: 'Montserrat', sans-serif !important;
     font-weight: 300; 
-    color: {TEXT_CREAM}; 
+    color: {TEXT_CREAM}; /* Default text color */
 }}
 /* Motto - Libre Baskerville, Uppercase */
 .motto {{
@@ -79,19 +69,12 @@ p, div, label {{
     margin-top: -10px;
     font-size: 1.1em;
     text-align: center; 
+    color: {TEXT_CREAM};
 }}
 
 /* Nastavení barvy textu v krémových sekcích */
 .section-cream p, .section-cream div, .section-cream label {{
     color: {TEXT_BLACK}; 
-}}
-
-/* NÁVRAT KE STABILNÍMU STYLU ST.TABLE */
-.stTable table thead th, .stTable table tbody td {{
-    background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important; /* ČITELNÝ TEXT */
-    border: 1px solid {TEXT_BLACK}; 
-    border-radius: 0px !important;
 }}
 
 /* *** KRITICKÁ OPRAVA: AI BOX (st.info) - ZRUŠIT MODROU VÝPLŇ *** */
@@ -109,6 +92,18 @@ div[data-testid="stAlert"] svg {{
     fill: {TEXT_CREAM} !important; 
 }}
 
+
+/* ZAJIŠTĚNÍ ČITELNOSTI TEXTU V TABULKÁCH (vše krémové, ale text černý) */
+.stTable table thead th, .stTable table tbody td {{
+    background-color: {BG_CREAM} !important;
+    color: {TEXT_BLACK} !important; 
+    border: 1px solid {TEXT_BLACK}; 
+    border-radius: 0px !important;
+}}
+/* Nastavení pozadí celého tabulkového kontejneru na krémovou */
+.stTable table {{
+    background-color: {BG_CREAM} !important;
+}}
 
 /* Centrování Celkového skóre s RÁMEČKEM */
 .score-line-container {{
