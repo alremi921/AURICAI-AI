@@ -1,0 +1,13 @@
+Month,Return
+Leden,0.16
+Únor,0.52
+Březen,0.03
+Duben,-0.65
+Květen,1,19
+Červen,-0.33
+Červenec,-0.35
+Srpen,0.10
+Září,0.62
+Říjen,0.40
+Listopad,0.67
+Prosinec,-0.56

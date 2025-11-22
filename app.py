@@ -14,6 +14,7 @@ TEXT_CREAM = '#F2EEDB'
 TEXT_BLACK = '#0C0C0C'
 
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
+DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NOVÁ CESTA K SOUBORU
 LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
@@ -96,24 +97,30 @@ div[data-testid="stAlert"] svg {{
 /* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
 
 /* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ A STÍNŮ */
-div[data-testid*="stTable"], 
-div[data-testid*="stDataFrame"],
-/* Cílení na všechny podřízené elementy s !important */
-div[data-testid*="stTable"] *,
+/* Cílíme na VŠECHNY podřízené elementy uvnitř tabulkového kontejneru a potlačujeme border-radius a box-shadow */
+div[data-testid*="stTable"] *, 
 div[data-testid*="stDataFrame"] * {{
     border-radius: 0 !important;
-    /* Odstranění stínů, které mohou způsobovat zatmavené rohy */
     box-shadow: none !important; 
+    outline: none !important;
 }}
 
-/* Cílení na hlavní Streamlit kontejnery, které mohou mít zaoblené rohy a stíny */
-div[data-testid="stTable"] > div, 
-div[data-testid="stDataFrame"] > div,
-div[data-testid="stTable"] > div:first-child, 
-div[data-testid="stDataFrame"] > div:first-child
-{{
+/* Cílíme na hlavní Streamlit kontejnery pro zvětšení "původního pole" a odstranění vnějších borderů */
+div[data-testid*="stTable"], 
+div[data-testid*="stDataFrame"] {{
+    box-shadow: none !important; 
+    border: none !important;
+    outline: none !important;
+    background-color: {BG_BLACK} !important;
+    padding: 0 !important; /* Odstraní vnitřní odsazení kontejneru */
+    margin: 0 !important;
+}}
+/* Poslední záchranná brzda proti zaoblení na okrajích, které by mohlo být stínem */
+div[data-testid="stTable"] > div,
+div[data-testid="stDataFrame"] > div {{
+    border: none !important;
+    box-shadow: none !important;
     border-radius: 0 !important;
-    overflow: hidden; 
 }}
 
 
@@ -132,6 +139,7 @@ div[data-testid="stDataFrame"] table td
     color: {TEXT_CREAM} !important; 
     border: 1px solid {TEXT_CREAM};
     border-radius: 0 !important; /* Vynucení ostrých hran na buňkách */
+    box-shadow: none !important;
 }}
 
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
@@ -200,6 +208,7 @@ st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
 # KONFIGURACE DAT
 # -------------------------
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
+DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NOVÁ KONSTANTA PRO SOUBOR
 LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
@@ -237,6 +246,36 @@ def load_events_from_csv():
     except Exception as e:
         st.error(f"Nepodařilo se načíst nebo zpracovat soubor CSV. Chyba: {e}")
         return pd.DataFrame()
+
+# NOVÁ FUNKCE: Načte skutečná data USDX pro sezónnost
+@st.cache_data
+def load_seasonality_data():
+    if not os.path.exists(DXY_HISTORY_PATH):
+        return None
+    try:
+        # Očekáváme sloupec 'Month' (jako text Měsíc) a 'Return' (jako průměrná návratnost v %)
+        df = pd.read_csv(DXY_HISTORY_PATH)
+        if 'Month' not in df.columns or 'Return' not in df.columns:
+            st.warning(f"Soubor '{DXY_HISTORY_PATH}' by měl obsahovat sloupce 'Month' (text) a 'Return' (číslo). Používám mock data.")
+            return None
+        
+        # Převedeme názvy měsíců na index pro správné řazení v grafu
+        month_to_index = {
+            "Leden": 1, "Únor": 2, "Březen": 3, "Duben": 4, "Květen": 5, "Červen": 6, 
+            "Červenec": 7, "Srpen": 8, "Září": 9, "Říjen": 10, "Listopad": 11, "Prosinec": 12
+        }
+        df['Month_Index'] = df['Month'].map(month_to_index)
+        
+        if df['Month_Index'].isnull().any():
+             st.warning(f"Některé názvy měsíců v souboru '{DXY_HISTORY_PATH}' nejsou platné. Používám mock data.")
+             return None
+             
+        df = df.sort_values('Month_Index').reset_index(drop=True)
+        return df
+    except Exception as e:
+        st.error(f"Nepodařilo se načíst nebo zpracovat soubor sezónnosti CSV. Chyba: {e}")
+        return None
+
 
 def score_event(row):
     a = clean_num(row.get("Actual"))
@@ -293,6 +332,28 @@ def highlight_points_and_style_text(row):
     
     return styles
 
+# --- POMOCNÁ FUNKCE PRO SEZONNOST (DXY MOCK DATA) ---
+def generate_dxy_seasonality_data():
+    # Simulovaná data průměrné měsíční návratnosti USD Indexu ($DXY), struktura podle Barchart
+    months = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", 
+              "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"]
+    # Mock data pro DXY (Silný Q1/Q4, Slabý Q2/Q3)
+    mock_returns = [0.8, 0.4, 0.6, -0.2, -0.4, -0.8, 
+                    -0.6, -0.3, 0.2, 0.5, 0.9, 0.7]
+    
+    df = pd.DataFrame({
+        "Month": months,
+        "Return": mock_returns
+    })
+    
+    # Přidání indexu pro správné řazení v grafu
+    month_to_index = {
+        "Leden": 1, "Únor": 2, "Březen": 3, "Duben": 4, "Květen": 5, "Červen": 6, 
+        "Červenec": 7, "Srpen": 8, "Září": 9, "Říjen": 10, "Listopad": 11, "Prosinec": 12
+    }
+    df['Month_Index'] = df['Month'].map(month_to_index)
+    return df.set_index('Month_Index').sort_values('Month_Index')
+# -----------------------------------------------------
 
 # -------------------------
 # BUILD DASHBOARD
@@ -305,7 +366,7 @@ st.markdown("<p class='small-title'>USD MACRO AI DASHBOARD</p>", unsafe_allow_ht
 # Hlavní nadpis (Montserrat Light, Uppercase)
 st.title("AURICAI AI")
 # Motto (Libre Baskerville)
-st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
+st.markdown("<p class='motto'>"BEAT THE ODDS"</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
 # Načítání dat
@@ -430,6 +491,61 @@ if not viz_agg.empty:
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Není dost dat pro graf.")
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
+st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
+
+# -------------------------
+# 5.5 GRAF SEZÓNNOSTI USD
+# -------------------------
+st.markdown("<div class='section-black'>", unsafe_allow_html=True)
+st.header("Graf sezónnosti USD (Historický výkon)")
+
+df_seasonality = load_seasonality_data()
+use_mock_data = False
+
+if df_seasonality is None:
+    df_seasonality = generate_dxy_seasonality_data()
+    use_mock_data = True
+
+if use_mock_data:
+    st.markdown(f"""
+        <p style='text-align: center; font-size: 0.9em;'>
+            POZNÁMKA: Soubor **'{DXY_HISTORY_PATH}'** nebyl nalezen nebo má neplatný formát. 
+            Graf zobrazuje MOCK data sezónnosti pro USD Index ($DXY). 
+            Pro zobrazení skutečných dat vložte CSV se sloupci 'Month' (Leden, Únor, atd.) a 'Return'.
+        </p>
+    """, unsafe_allow_html=True)
+    y_column = "Return"
+    title_suffix = "– Mock data"
+else:
+    st.markdown(f"""
+        <p style='text-align: center; font-size: 0.9em;'>
+            Graf zobrazuje průměrnou měsíční návratnost, vypočítanou ze souboru **'{DXY_HISTORY_PATH}'**.
+        </p>
+    """, unsafe_allow_html=True)
+    y_column = "Return"
+    title_suffix = ""
+
+
+# Změna na LINE CHART
+fig_season = px.line(df_seasonality, 
+                    x="Month", 
+                    y=y_column,
+                    title=f"Průměrná měsíční návratnost USD Indexu ($DXY) {title_suffix}",
+                    labels={y_column: "Průměrná návratnost (%)", "Month": "Měsíc"},
+                    markers=True, line_shape='linear') # Použití line chartu
+
+# Přidání nulové linie pro přehlednost
+fig_season.add_hline(y=0, line_dash="dash", line_color=TEXT_CREAM)
+
+fig_season.update_layout(
+    plot_bgcolor=f"{BG_BLACK}", 
+    paper_bgcolor=f"{BG_BLACK}",
+    font_color=f"{TEXT_CREAM}",
+    title_font_color=f"{TEXT_CREAM}"
+)
+st.plotly_chart(fig_season, use_container_width=True)
+
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
     
