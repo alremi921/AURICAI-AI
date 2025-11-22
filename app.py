@@ -95,19 +95,27 @@ div[data-testid="stAlert"] svg {{
 /* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
 /* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
 
-/* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ */
-div[data-testid="stTable"], 
-div[data-testid="stDataFrame"],
+/* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ A STÍNŮ */
+div[data-testid*="stTable"], 
+div[data-testid*="stDataFrame"],
+/* Cílení na všechny podřízené elementy s !important */
+div[data-testid*="stTable"] *,
+div[data-testid*="stDataFrame"] * {{
+    border-radius: 0 !important;
+    /* Odstranění stínů, které mohou způsobovat zatmavené rohy */
+    box-shadow: none !important; 
+}}
+
+/* Cílení na hlavní Streamlit kontejnery, které mohou mít zaoblené rohy a stíny */
 div[data-testid="stTable"] > div, 
 div[data-testid="stDataFrame"] > div,
 div[data-testid="stTable"] > div:first-child, 
-div[data-testid="stDataFrame"] > div:first-child,
-div[data-testid="stTable"] .stTable,
-div[data-testid="stDataFrame"] .stDataFrame
+div[data-testid="stDataFrame"] > div:first-child
 {{
     border-radius: 0 !important;
-    overflow: hidden; /* Zabrání vykreslení zaoblení, pokud by přetékalo */
+    overflow: hidden; 
 }}
+
 
 /* 2. Cílení na samotné buňky a tělo tabulky */
 div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
