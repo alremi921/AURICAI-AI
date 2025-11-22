@@ -6,59 +6,24 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import os 
 
-st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
-
 # -------------------------
-# VLOŽENÍ VLASTNÍHO FUTURISTICKÉHO CSS
+# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU A FONT (Standardní Streamlit design)
 # -------------------------
-# Primární barvy: Černá/Navy pozadí, Pink (#FF00FF), Baby Blue (#89CFF0)
-custom_css = """
+st.markdown("""
 <style>
-/* 1. Celkové pozadí a písmo (Dark Theme Override) */
+/* Streamlit standardní tmavé téma je zachováno, ale přidáme centrování */
 .stApp {
-    background-color: #0d0d0d; /* Velmi tmavé pozadí */
-    color: #e0e0e0;
+    padding-top: 20px;
 }
-/* 2. Stylování titulků a akcentů */
-h1 {
-    color: #FF00FF; /* Růžová pro hlavní titulek */
-    text-shadow: 0 0 5px #FF00FF, 0 0 10px #FF00FF; /* Světelný efekt */
-    font-size: 2.5em;
-    font-weight: 700;
-}
-h2, h3 {
-    color: #89CFF0; /* Baby Blue pro podtitulky */
-    border-bottom: 2px solid #333344;
-    padding-bottom: 5px;
-    margin-top: 20px;
-}
-/* 3. Streamlit kontejnery a karty */
-.stAlert.info, .stDataFrame, .stTable, .stPlotlyChart {
-    background-color: #1a1a1a; /* Tmavě šedé pozadí pro karty */
-    border-radius: 8px;
-    padding: 10px;
-    border: 1px solid #333344; /* Jemný rámeček */
-}
-/* 4. Tlačítka pro download */
-.stDownloadButton button {
-    background-color: #89CFF0;
-    color: #000000;
-    border-radius: 15px;
-    font-weight: bold;
-    border: 2px solid #000000;
-}
-/* 5. Infobox (AI Vyhodnocení) - Konzolidovaný blok */
-.ai-summary-block {
-    padding: 15px; 
-    border-radius: 8px; 
-    background-color: #1a1a1a; 
-    margin-top: 20px;
-    border: 2px solid #FF00FF; /* Růžový akcent */
+/* Zarovnání prvků do středu (vyžaduje úpravu kontejneru) */
+.css-1d391kg {
+    justify-content: center;
+    text-align: center;
 }
 </style>
-"""
-st.markdown(custom_css, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
+st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
 
 # -------------------------
 # KONFIGURACE DAT
@@ -144,22 +109,15 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     else: summary += "Celkový neutralní výsledek poukazuje na vyváženou situaci. "
     return summary
 
-# Funkce pro stylování Pandas DataFrame (futuristické barvy pro body)
-def color_points(val):
+# Funkce pro stylování Pandas DataFrame (Nativní Streamlit styly)
+def color_points_basic(val):
     val = pd.to_numeric(val, errors='coerce')
     if val > 0:
-        color = 'background-color: #203020; color: #00FF00' # Zelená záře
+        # Používá se standardní CSS pro pozadí (čistě funkční barvy)
+        return 'background-color: #38761d; color: white' 
     elif val < 0:
-        color = 'background-color: #302020; color: #FF0000' # Červená záře
-    else:
-        color = 'background-color: #202030; color: #89CFF0' # Modrá záře
-    return color
-
-# Funkce pro barvu celkového labelu
-def color_score_label(label):
-    if 'Bullish' in label: return '#00FF00' 
-    if 'Bearish' in label: return '#FF0000'
-    return '#89CFF0'
+        return 'background-color: #cc0000; color: white'
+    return 'background-color: #3d85c6; color: white'
 
 # -------------------------
 # BUILD DASHBOARD
@@ -167,7 +125,7 @@ def color_score_label(label):
 
 # 1. HLAVNÍ TITULEK A MOTTO
 st.title("USD Macro AI Dashboard")
-st.markdown("#### *BEAT THE ODDS*", unsafe_allow_html=True) # ZMĚNĚNO MOTTO
+st.markdown("#### *BEAT THE ODDS*", unsafe_allow_html=True) 
 st.markdown("---")
 
 # 2. SKRYTÍ SEKCE Data fetch & processing (pouze načítání)
@@ -205,7 +163,8 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    styled_df = display_df.style.applymap(color_points, subset=['Points'])
+    # Stylování (pro jednoduchost používáme applymap přímo v tabulce, ne v summary)
+    styled_df = display_df.style.applymap(color_points_basic, subset=['Points'])
     
     if i % 2 == 0:
         with cols[0]:
@@ -221,7 +180,7 @@ st.markdown("---")
 # -------------------------
 # 4. VYHODNOCENÍ FUNDAMENTU A AI ANALÝZA (KONZOLIDACE)
 # -------------------------
-st.header("Vyhodnocení fundamentu")
+st.header("Vyhodnocení fundamentu") # Přejmenováno
 
 summary_rows = []
 total_combined_score = 0
@@ -243,56 +202,32 @@ if final_score > 2: final_label = "Bullish pro USD"
 elif final_score < -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-st.subheader("Category summary")
-# Tabulka s hodnocením jednotlivých kategorií
-styled_summary = summary_df.style.applymap(
-    lambda x: color_score_label(x) if x in ["Bullish", "Bearish", "Neutral"] else '', 
-    subset=['Evaluation']
-).format({"Total Points":"{:+d}"})
+st.subheader("Category summary") # Přejmenováno na Category summary
 
-st.table(styled_summary)
+# Zobrazení standardní, nestylované tabulky pro stabilitu
+st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # KONZOLIDACE: Celkové skóre + AI Vyhodnocení v jednom bloku
-st.markdown(f"""
-    <div class="ai-summary-block">
-        <h3 style="margin-bottom: 5px; color: #FF00FF; border-bottom: none;">
-            Celkové fundamentální skóre: 
-            <span style="font-size: 1.5em; font-weight: bold; color: {color_score_label(final_label)}; text-shadow: 0 0 8px {color_score_label(final_label)};">{final_score:+d}</span> 
-            — <span style="font-weight: bold; color: {color_score_label(final_label)};">{final_label}</span>
-        </h3>
-        
-        <p style="color: #89CFF0; font-weight: bold; margin-top: 20px; font-size: 1.1em;">
-            AI Fundamentální Vyhodnocení:
-        </p>
-        <div style="color: #e0e0e0; margin-top: 5px;">
-            {generate_ai_summary(summary_df, final_score, final_label).replace('**', '')}
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+# Používáme st.markdown pro zobrazení finálního výsledku s barvou
+st.markdown(f"### Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**")
+st.subheader("AI Fundamentální Vyhodnocení")
+st.info(generate_ai_summary(summary_df, final_score, final_label).replace('**', ''))
+
 
 st.markdown("---")
 
 # -------------------------
 # 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ
 # -------------------------
-st.header("Graf fundamentálních kategorií")
+st.header("Graf fundamentálních kategorií") # Přejmenováno
 
-viz_df = df_scored.copy() # Graf zobrazuje pouze proběhlé události
+viz_df = df_scored.copy() 
 viz_df["DateSimple"] = viz_df["DateParsed"].dt.date
 viz_agg = viz_df.groupby(["DateSimple","Category"])["Points"].sum().reset_index()
 
 if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Body podle kategorie v čase (denní agregát z proběhlých událostí)")
-    
-    # Úprava grafu pro tmavý/futuristický design
-    fig.update_layout(
-        plot_bgcolor='#1a1a1a', 
-        paper_bgcolor='#1a1a1a', 
-        font_color='#e0e0e0',
-        title_font_color='#89CFF0',
-        legend_title_font_color='#FF00FF'
-    )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Není dost dat pro graf.")
