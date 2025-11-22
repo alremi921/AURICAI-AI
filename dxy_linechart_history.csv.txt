@@ -3,7 +3,7 @@ Leden,0.16
 Únor,0.52
 Březen,0.03
 Duben,-0.65
-Květen,1,19
+Květen,1.19
 Červen,-0.33
 Červenec,-0.35
 Srpen,0.10

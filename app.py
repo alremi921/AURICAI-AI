@@ -130,6 +130,7 @@ div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
     table-layout: auto; 
     border-collapse: collapse;
 }}
+/* Zajištění viditelnosti hran - zvýšení tloušťky border */
 div[data-testid="stTable"] table th, 
 div[data-testid="stTable"] table td,
 div[data-testid="stDataFrame"] table th,
@@ -137,10 +138,14 @@ div[data-testid="stDataFrame"] table td
 {{
     background-color: {BG_BLACK} !important;
     color: {TEXT_CREAM} !important; 
-    border: 1px solid {TEXT_CREAM};
+    border: 2px solid {TEXT_CREAM}; /* ZVÝŠENÍ TLOUŠŤKY BORDERU */
     border-radius: 0 !important; /* Vynucení ostrých hran na buňkách */
     box-shadow: none !important;
 }}
+div[data-testid="stTable"] table th {{
+    border-bottom: 2px solid {TEXT_CREAM} !important; /* Zajištění oddělení hlavičky */
+}}
+
 
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
 div[data-testid="stTable"] table th {{
@@ -254,7 +259,9 @@ def load_seasonality_data():
         return None
     try:
         # Očekáváme sloupec 'Month' (jako text Měsíc) a 'Return' (jako průměrná návratnost v %)
-        df = pd.read_csv(DXY_HISTORY_PATH)
+        # Používáme CSV s oddělovačem čárka a desetinnou tečkou
+        df = pd.read_csv(DXY_HISTORY_PATH, decimal='.', sep=',') 
+        
         if 'Month' not in df.columns or 'Return' not in df.columns:
             st.warning(f"Soubor '{DXY_HISTORY_PATH}' by měl obsahovat sloupce 'Month' (text) a 'Return' (číslo). Používám mock data.")
             return None
@@ -273,6 +280,7 @@ def load_seasonality_data():
         df = df.sort_values('Month_Index').reset_index(drop=True)
         return df
     except Exception as e:
+        # Logujeme chybu pro Streamlit (i po opravě CSV je dobré ji nechat)
         st.error(f"Nepodařilo se načíst nebo zpracovat soubor sezónnosti CSV. Chyba: {e}")
         return None
 
@@ -322,7 +330,7 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 # Nyní zajišťuje pouze ostré hrany a vynucuje BG_BLACK/TEXT_CREAM na každé buňce.
 def highlight_points_and_style_text(row):
     # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
-    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; border-radius: 0 !important;'
+    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 2px solid {TEXT_CREAM}; border-radius: 0 !important;'
     styles = [default_style] * len(row)
     
     # Vynutíme stejný styl i pro sloupec Points
@@ -366,7 +374,7 @@ st.markdown("<p class='small-title'>USD MACRO AI DASHBOARD</p>", unsafe_allow_ht
 # Hlavní nadpis (Montserrat Light, Uppercase)
 st.title("AURICAI AI")
 # Motto (Libre Baskerville)
-st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
+st.markdown("<p class='motto'> "BEAT THE ODDS" </p>", unsafe_allow_html=True) 
 st.markdown("---")
 
 # Načítání dat
@@ -511,7 +519,7 @@ if use_mock_data:
     st.markdown(f"""
         <p style='text-align: center; font-size: 0.9em;'>
             POZNÁMKA: Soubor **'{DXY_HISTORY_PATH}'** nebyl nalezen nebo má neplatný formát. 
-            Graf zobrazuje MOCK data sezónnosti pro USD Index ($DXY). 
+            Graf zobrazuje MOCK data sezónnosti pro USD Index ($DXY$). 
             Pro zobrazení skutečných dat vložte CSV se sloupci 'Month' (Leden, Únor, atd.) a 'Return'.
         </p>
     """, unsafe_allow_html=True)
@@ -531,9 +539,12 @@ else:
 fig_season = px.line(df_seasonality, 
                     x="Month", 
                     y=y_column,
-                    title=f"Průměrná měsíční návratnost USD Indexu ($DXY) {title_suffix}",
+                    title=f"Průměrná měsíční návratnost USD Indexu ($DXY$) {title_suffix}",
                     labels={y_column: "Průměrná návratnost (%)", "Month": "Měsíc"},
                     markers=True, line_shape='linear') # Použití line chartu
+
+# *** NOVÁ ÚPRAVA: Nastavení barvy čáry na světlou (TEXT_CREAM) ***
+fig_season.update_traces(line=dict(color=TEXT_CREAM), marker=dict(color=TEXT_CREAM))
 
 # Přidání nulové linie pro přehlednost
 fig_season.add_hline(y=0, line_dash="dash", line_color=TEXT_CREAM)
