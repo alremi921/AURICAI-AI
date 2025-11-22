@@ -22,6 +22,7 @@ LOOKBACK_DAYS = 90
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
 
+# CATEGORY NAMES ARE ALREADY IN ENGLISH IN DATA FILE
 CATEGORY_KEYWORDS = {
     "Inflation": [], "Interest Rates": [], "Labor Market": [], "Economic Activity": []
 }
@@ -190,6 +191,7 @@ LOOKBACK_DAYS = 90
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
 
+# CATEGORY NAMES ARE ALREADY IN ENGLISH IN DATA FILE
 CATEGORY_KEYWORDS = {
     "Inflation": [], "Interest Rates": [], "Labor Market": [], "Economic Activity": []
 }
@@ -219,6 +221,9 @@ def load_events_from_csv():
         df["DateParsed"] = pd.to_datetime(df["Date"], errors="coerce")
         df = df[df["DateParsed"].notna()]
         df = df[df["DateParsed"] >= pd.Timestamp(START_DATE)]
+        
+        # Data file must now contain English categories (Inflation, Labor Market, etc.)
+        
         return df.sort_values("DateParsed", ascending=False).reset_index(drop=True)
     except Exception as e:
         st.error(f"Could not load or process the CSV file. Error: {e}")
@@ -231,6 +236,7 @@ def load_seasonality_data():
         return None
     try:
         # Expects 'Month' column (as month name) and 'Return' (as average return in %)
+        # Data file must use English month names (Jan, Feb, etc.)
         df = pd.read_csv(DXY_HISTORY_PATH, decimal='.', sep=',') 
         
         if 'Month' not in df.columns or 'Return' not in df.columns:
@@ -239,12 +245,13 @@ def load_seasonality_data():
         
         # Converts month names to index for correct plotting order
         month_to_index = {
-            "Leden": 1, "Únor": 2, "Březen": 3, "Duben": 4, "Květen": 5, "Červen": 6, 
-            "Červenec": 7, "Srpen": 8, "Září": 9, "Říjen": 10, "Listopad": 11, "Prosinec": 12
+            "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, 
+            "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
         }
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
+             # If mapping fails (e.g., if month names are still Czech), return None
              return None
              
         df = df.sort_values('Month_Index').reset_index(drop=True)
@@ -496,7 +503,7 @@ if df_seasonality is None:
     # If file load fails or is missing, use mock data
     df_seasonality = generate_dxy_seasonality_data()
     use_mock_data = True
-    st.info(f"Note: Could not load or process seasonality file. Displaying MOCK seasonality data. Please ensure '{DXY_HISTORY_PATH}' is correctly formatted (Month,Return).")
+    st.info(f"Note: Could not load or process seasonality file. Displaying MOCK seasonality data. Please ensure '{DXY_HISTORY_PATH}' is correctly formatted (Month,Return) and contains English month names if file is used.")
 
 
 y_column = "Return"
@@ -507,7 +514,7 @@ fig_season = px.line(df_seasonality,
                     y=y_column,
                     title=f"Average Monthly Return",
                     labels={y_column: "Average Return (%)", "Month": "Month"},
-                    markers=True, line_shape='linear')
+                    markers=True, line_shape='linear') # Use line chart
 
 # *** Adjustment: Set line color to light (TEXT_CREAM) ***
 fig_season.update_traces(line=dict(color=TEXT_CREAM), marker=dict(color=TEXT_CREAM))
