@@ -92,7 +92,7 @@ div[data-testid="stAlert"] svg {{
 }}
 
 
-/* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT) *** */
+/* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
 /* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
 div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
     width: 100% !important; /* ROZTAŽENÍ SUMMARY TABULKY */
@@ -107,14 +107,21 @@ div[data-testid="stDataFrame"] table td
     background-color: {BG_BLACK} !important;
     color: {TEXT_CREAM} !important; 
     border: 1px solid {TEXT_CREAM};
+    border-radius: 0 !important; /* Vynucení ostrých hran */
+}}
+
+/* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
+div[data-testid="stTable"] table th {{
+    white-space: nowrap !important;
 }}
 
 
-/* Centrování Celkového skóre s RÁMEČKEM (Oprava Centrování) */
+/* Centrování Celkového skóre s RÁMEČKEM (Odstranění rámečku a Oprava Centrování) */
 .score-line-container {{
-    padding: 15px;
-    border: 1px solid {TEXT_CREAM}; 
-    display: inline-block; 
+    /* Zrušení rámečku */
+    border: none; 
+    padding: 0;
+    display: block; /* Použijeme blok pro snadnější centrování uvnitř center-div */
     margin: 20px auto 30px auto; 
     text-align: center;
 }}
@@ -155,6 +162,7 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     justify-content: center;
     width: 100%; /* Vynuceno pro celou sekci/kontejner */
 }}
+/* Vynucuje centrování score-line-container i po odstranění inline-block */
 .center-div {{
     display: flex;
     justify-content: center;
@@ -223,14 +231,19 @@ def evaluate_category(df_cat):
     
     if total >= 2: label = "Bullish"
     elif total <= -2: label = "Bearish"
-    else: label = "Neutral"
+    else: label = "Neutral" # Catches 1, 0, -1
     return total, label
 
 # ZKRÁCENÉ AI shrnutí (cca 3-4 věty)
 def generate_ai_summary(summary_df, final_score, overall_label):
     
-    strongest = summary_df.sort_values('Total Points', ascending=False).iloc[0]
-    weakest = summary_df.sort_values('Total Points', ascending=True).iloc[0]
+    # Zde používáme bezpečné indexování, které funguje i pro DataFrame s jedním řádkem
+    if not summary_df.empty:
+        strongest = summary_df.sort_values('Total Points', ascending=False).iloc[0]
+        weakest = summary_df.sort_values('Total Points', ascending=True).iloc[0]
+    else:
+        strongest = {'Category': 'N/A', 'Total Points': 0}
+        weakest = {'Category': 'N/A', 'Total Points': 0}
     
     summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce dosáhlo hodnoty {final_score:+d}, což signalizuje **{overall_label}** sentiment pro americký dolar. "
     
@@ -248,8 +261,8 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 # Tato funkce se aplikuje na řádek (axis=1) a kontroluje sloupec 'Points'
 def highlight_points_and_style_text(row):
     # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
-    # white-space: nowrap zabraňuje přeskakování písmen v dlouhých názvech.
-    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; white-space: nowrap;'
+    # white-space: nowrap je nyní v globálním CSS pro hlavičky. 
+    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; border-radius: 0 !important;'
     styles = [default_style] * len(row)
     
     # Najdeme index sloupce 'Points'
@@ -260,24 +273,32 @@ def highlight_points_and_style_text(row):
         # Aplikujeme speciální barvy pro kladné/záporné body
         if pd.notna(val):
             if val > 0:
-                styles[idx] = 'background-color: #38761d; color: white; border: 1px solid #38761d; white-space: nowrap;' 
+                styles[idx] = 'background-color: #38761d; color: white; border: 1px solid #38761d; border-radius: 0 !important;' 
             elif val < 0:
-                styles[idx] = 'background-color: #cc0000; color: white; border: 1px solid #cc0000; white-space: nowrap;'
+                styles[idx] = 'background-color: #cc0000; color: white; border: 1px solid #cc0000; border-radius: 0 !important;'
             else:
-                 # 0 bodů - standardní styl
+                 # 0 bodů - standardní styl (Neutral)
                  styles[idx] = default_style
     
     return styles
 
-# Funkce pro stylování Souhrnné tabulky (sloupec 'Total Points')
-def color_summary_points_column(val):
-    val_num = pd.to_numeric(val, errors='coerce')
-    if val_num > 0:
-        return 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
-    elif val_num < 0:
-        return 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
-    # Výchozí styl: Černé pozadí, Krémový text
-    return f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM};'
+# NOVÁ: Funkce pro stylování CELÉHO řádku souhrnné tabulky
+def color_evaluation_row(row):
+    # Bullish: tmavě zelená (#38761d), Bearish: tmavě červená (#cc0000), Neutral: BG_BLACK
+    
+    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; border-radius: 0 !important;'
+    bullish_style = 'background-color: #38761d; color: white; border: 1px solid #38761d; border-radius: 0 !important;'
+    bearish_style = 'background-color: #cc0000; color: white; border: 1px solid #cc0000; border-radius: 0 !important;'
+    
+    if row['Evaluation'] == 'Bullish':
+        style = bullish_style
+    elif row['Evaluation'] == 'Bearish':
+        style = bearish_style
+    else: # Neutral
+        style = default_style
+        
+    return [style] * len(row)
+
 
 # -------------------------
 # BUILD DASHBOARD
@@ -335,6 +356,8 @@ for i, cat in enumerate(unique_categories):
     )
     
     # Aplikace OPRAVENÉHO STYLU pro čitelnost a zamezení zalamování
+    # Všimněte si, že zde st.table volá st.dataframe, který má globálně nastavenou 100% šířku,
+    # ale je uvnitř Streamlit sloupce, což efektivně zmenší jeho prostor.
     styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1)
 
     if i % 2 == 0:
@@ -374,16 +397,13 @@ if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-# Zobrazení souhrnné tabulky (Nyní celá šířka)
-# Aplikujeme formát a styl pro Total Points, zbytek pro BLACK/CREAM
+# Zobrazení souhrnné tabulky (Nyní celá šířka a barvení řádků)
 styled_summary = summary_df.style.format({"Total Points":"{:+d}"}) \
-    .applymap(color_summary_points_column, subset=['Total Points']) \
-    .applymap(lambda v: f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM};', 
-              subset=['Category', 'Events Count', 'Evaluation'])
+    .apply(color_evaluation_row, axis=1) # Aplikuje barvení celého řádku
 
 st.table(styled_summary) 
 
-# Podtržení Celkového skóre (v Black sekci, text je CREAM, CENTROVÁNO)
+# Podtržení Celkového skóre (v Black sekci, text je CREAM, CENTROVÁNO a bez rámečku)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
 st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
