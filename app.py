@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -93,18 +92,23 @@ div[data-testid="stAlert"] svg {{
 }}
 
 
-/* ZAJIŠTĚNÍ ČITELNOSTI TEXTU V TABULKÁCH (vše krémové, text černý - STABILNÍ VERZE BEZ STYLE APLLY) */
-/* Vracíme na základní st.table s pevnými barvami, aby se text NEZTRATIL */
-.stTable table thead th, .stTable table tbody td {{
-    background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important; /* KRITICKÉ: ČERNÝ TEXT NA KRÉMOVÉM POZADÍ */
-    border: 1px solid {TEXT_BLACK}; 
-    border-radius: 0px !important;
-}}
-.stTable table {{
+/* *** KRITICKÉ: FIX PRO TABULKY A NÁHLAVI *** */
+/* Standardní buňky v sekci CREAM by měly být BLACK text na CREAM pozadí, 
+   ale Streamlit Styler toto často přebíjí. Použijeme univerzální tmavou barvu
+   pro hlavičky st.table a st.dataframe v sekci CREAM. */
+.section-cream table th {{
+    color: {TEXT_BLACK} !important; 
     background-color: {BG_CREAM} !important;
 }}
-
+/* Zajistíme, že i bez styleru budou data viditelná v Black Sekci */
+.section-black table td {{
+    color: {TEXT_CREAM} !important;
+    background-color: {BG_BLACK} !important;
+}}
+.section-black table th {{
+    color: {TEXT_CREAM} !important;
+    background-color: {BG_BLACK} !important;
+}}
 
 /* Centrování Celkového skóre s RÁMEČKEM */
 .score-line-container {{
@@ -238,16 +242,38 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     
     return summary
 
-# Funkce pro stylování Pandas DataFrame
-def color_points_basic(val):
-    val = pd.to_numeric(val, errors='coerce')
-    # Ostré krémové buňky
-    style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};' 
-    if val > 0:
-        style = 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
-    elif val < 0:
-        style = 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
-    return style
+# --- NOVÁ FUNKCE PRO STYLOVÁNÍ DATAFRAMU (OPRAVA ČITELNOSTI) ---
+# Tato funkce se aplikuje na řádek (axis=1) a kontroluje sloupec 'Points'
+def highlight_points_and_style_text(row):
+    # Výchozí styl pro VŠECHNY buňky: Krémové pozadí, ČERNÝ TEXT
+    default_style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};'
+    styles = [default_style] * len(row)
+    
+    # Najdeme index sloupce 'Points'
+    if 'Points' in row.index:
+        idx = row.index.get_loc('Points')
+        val = row['Points']
+        
+        # Aplikujeme speciální barvy pro kladné/záporné body
+        if pd.notna(val):
+            if val > 0:
+                styles[idx] = 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
+            elif val < 0:
+                styles[idx] = 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
+            else:
+                 # 0 bodů by mělo mít také ČERNÝ text na CREAM pozadí
+                 styles[idx] = default_style
+    
+    return styles
+
+# Funkce pro stylování Souhrnné tabulky (sloupec 'Total Points')
+def color_summary_points_column(val):
+    val_num = pd.to_numeric(val, errors='coerce')
+    if val_num > 0:
+        return 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
+    elif val_num < 0:
+        return 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
+    return f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};'
 
 # -------------------------
 # BUILD DASHBOARD
@@ -297,19 +323,22 @@ for i, cat in enumerate(unique_categories):
     category_frames[cat] = cat_df_scored
 
     cat_df_display = cat_df_display.sort_values("DateParsed", ascending=False)
+    # Zobrazované sloupce
     display_df = cat_df_display[["DateDisplay", "Report", "Actual", "Forecast", "Previous", "Points"]].rename(
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Používáme st.table s Pandas Styler pro zachování barevnosti
+    # Aplikace OPRAVENÉHO STYLU pomocí df.style.apply(..., axis=1) pro plnou kontrolu nad barvou textu
+    styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1)
+
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            st.table(display_df.style.applymap(color_points_basic, subset=['Points']))
+            st.table(styled_df)
     else:
         with cols[1]:
             st.subheader(cat)
-            st.table(display_df.style.applymap(color_points_basic, subset=['Points']))
+            st.table(styled_df)
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
 
@@ -339,8 +368,14 @@ if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-# Zobrazení standardní tabulky (Vyhodnocení fundamentu - bude krémová)
-st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
+# Zobrazení standardní tabulky (Vyhodnocení fundamentu - bude krémová, text černý)
+# Aplikujeme formát a styl pro Total Points, zbytek přes lambda funkci pro vynucení BLACK textu
+styled_summary = summary_df.style.format({"Total Points":"{:+d}"}) \
+    .applymap(color_summary_points_column, subset=['Total Points']) \
+    .applymap(lambda v: f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};', 
+              subset=['Category', 'Events Count', 'Evaluation'])
+
+st.table(styled_summary) 
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
