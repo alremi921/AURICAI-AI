@@ -153,6 +153,12 @@ div[data-testid="stDataFrame"] .col-header-row {{
     color: {TEXT_CREAM} !important;
 }}
 
+/* Cílení na div, který drží text uvnitř buňky (pro jistotu, že je text krémový) */
+div[data-testid="stDataFrame"] [data-baseweb="table-cell"] > div {{
+    color: {TEXT_CREAM} !important;
+}}
+
+
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
 div[data-testid="stTable"] table th {{
     white-space: nowrap !important;
