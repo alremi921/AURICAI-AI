@@ -6,99 +6,136 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import os 
 
+# Definice barev pro snadné použití
+BG_BLACK = '#0C0C0C'
+BG_CREAM = '#F2EEDB'
+TEXT_CREAM = '#F2EEDB'
+TEXT_BLACK = '#0C0C0C'
+
 # -------------------------
 # ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA (Old Money Style)
 # -------------------------
-st.markdown("""
+st.markdown(f"""
 <style>
 /* 1. Import Google Fonts (Fallback a Montserrat) */
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400&display=swap');
 
-/* Definice custom fontů (Zajištění stability: používáme fallback) */
-@font-face {
+/* Definice custom fontů (Zajištění stability: používáme Montserrat fallback) */
+@font-face {{
     font-family: 'The Seasons';
-    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Regular.ttf') format('truetype'); /* Použijeme stabilní Montserrat Regular jako placeholder/fallback */
+    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Regular.ttf') format('truetype');
     font-weight: 400;
-}
-@font-face {
+}}
+@font-face {{
     font-family: 'Beautifully Delicious Light';
-    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Light.ttf') format('truetype'); /* Použijeme stabilní Montserrat Light jako placeholder/fallback */
+    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Light.ttf') format('truetype');
     font-weight: 300;
-}
+}}
 
 
 /* 2. Streamlit celkové nastavení */
-.stApp {
+.stApp {{
     padding-top: 20px;
-    background-color: #0C0C0C; /* Washed Black pozadí (0C0C0C) */
-    color: #FAFAFA;
-}
+    background-color: {BG_BLACK}; /* Washed Black pozadí */
+    color: {TEXT_CREAM};
+}}
 
 /* 3. Stylování nadpisů */
 /* Hlavní nadpis H1: The Seasons (Regular) */
-h1 {
+h1 {{
     font-family: 'The Seasons', 'Montserrat', sans-serif !important; 
     text-align: center;
-    color: #FAFAFA;
-    font-weight: 400; /* Regular/Semi-bold */
+    color: {TEXT_CREAM};
+    font-weight: 400;
     letter-spacing: 2px;
-}
+}}
 
 /* Ostatní nadpisy H2, H3: Beautifully Delicious Light */
-h2, h3, h4 {
+h2, h3, h4 {{
     font-family: 'Beautifully Delicious Light', 'Montserrat', sans-serif !important; 
     text-align: center;
-    color: #FAFAFA;
-    font-weight: 300; /* Light */
-}
-
-/* Nadpis pro tabulky (Trh práce, Inflace atd.) */
-h3 {
-    font-family: 'Beautifully Delicious Light', 'Montserrat', sans-serif !important; 
-}
-
+    font-weight: 300; 
+    margin-bottom: 20px; /* Větší mezera pod nadpisy */
+}}
 
 /* 4. Stylování textu a motta */
-p, div, label, .stMarkdown {
+p, div, label {{
     font-family: 'Montserrat', sans-serif !important;
-    font-weight: 300; /* Light */
+    font-weight: 300; 
+}}
+.stMarkdown {{
     text-align: center;
-}
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 300;
+}}
 /* Motto - Montserrat Light, Velká písmena */
-.motto {
+.motto {{
     font-family: 'Montserrat', sans-serif !important;
     font-weight: 300; 
     text-transform: uppercase;
     letter-spacing: 3px;
-    margin-top: -10px; /* Přiblížení k hlavnímu nadpisu */
+    margin-top: -10px;
     font-size: 1.1em;
-}
+}}
 
-/* 5. Stylování tabulek a boxů (Ostré rohy, Washed Black pozadí) */
-.stDataFrame, .stTable {
+/* ZMĚNA: Stylování Tabulek */
+.stDataFrame, .stTable {{
     margin-left: auto;
     margin-right: auto;
-    background-color: #1a1a1a;
-    border-radius: 0px; /* Ostré rohy */
-    border: 1px solid #333333;
-}
+    border-radius: 0px !important; /* Ostré rohy */
+}}
+/* Cílení na hlavičky a buňky tabulek pro krémovou barvu */
+.stDataFrame table thead th, .stDataFrame table tbody td {{
+    background-color: {BG_CREAM} !important;
+    color: {TEXT_BLACK} !important;
+    border: 1px solid {TEXT_BLACK}; /* Čisté ostré rozdělení */
+}}
+/* Cílení na nadřazený kontejner tabulky (pro pozadí celého DataFrame) */
+div[data-testid="stTable"] {{
+    background-color: {BG_BLACK} !important; /* Pokud se nepodaří stylovat vnitřní buňky */
+}}
 
-/* Úprava AI boxu: odstraňujeme modré pozadí, ponecháváme bílý text a obrys */
-div[data-testid="stAlert"] {
-    background-color: transparent !important; /* Průhledné pozadí */
-    border: 1px solid #4A4A99 !important; /* Jemný modrý obrys */
-    color: #FAFAFA !important; /* Bílý text */
-}
-
-/* Podtržení Celkového skóre */
-.score-line {
-    border-bottom: 1px solid #666666;
+/* Úprava AI boxu: transparentní pozadí, bílý text, modrý obrys */
+div[data-testid="stAlert"] {{
+    background-color: transparent !important; 
+    border: 1px solid #4A4A99 !important; 
+    color: {TEXT_CREAM} !important; 
+    padding: 20px;
+    margin-top: 10px;
+}}
+/* Centrování Celkového skóre */
+.score-line {{
+    border-bottom: 1px solid {TEXT_CREAM};
     padding-bottom: 5px;
-    display: inline-block;
+    display: block; /* Změna na block pro plnou šířku a centrování */
+    text-align: center;
     font-size: 1.5em;
-    font-weight: 400; /* Regular */
-    margin-bottom: 15px;
-}
+    font-weight: 400; 
+    margin-bottom: 30px; /* Více místa pod skóre */
+    margin-top: 20px; /* Více místa nad skóre */
+}}
+
+/* --- BAREVNÉ SEKCE --- */
+.section-black {{
+    background-color: {BG_BLACK};
+    color: {TEXT_CREAM};
+    padding: 20px 0;
+}}
+.section-cream {{
+    background-color: {BG_CREAM};
+    color: {TEXT_BLACK};
+    padding: 20px 0;
+}}
+.section-cream h2, .section-cream h3, .section-cream h4 {{
+    color: {TEXT_BLACK} !important;
+}}
+.section-black h2, .section-black h3, .section-black h4 {{
+    color: {TEXT_CREAM} !important;
+}}
+.section-cream .stDataFrame table thead th, .section-cream .stDataFrame table tbody td {{
+    background-color: {BG_CREAM} !important;
+    color: {TEXT_BLACK} !important;
+}}
 
 </style>
 """, unsafe_allow_html=True)
@@ -155,49 +192,22 @@ def score_event(row):
     if a < f: return -1
     return 0
 
-# ZMĚNA LOGIKY: Bullish >+2, Neutral 1/0/-1, Bearish <-2
+# LOGIKA: Bullish >=+2, Neutral 1/0/-1, Bearish <=-2
 def evaluate_category(df_cat):
     df_scored = df_cat[pd.to_numeric(df_cat['Points'], errors='coerce').notna()]
     total = int(df_scored["Points"].sum())
     
     if total >= 2: label = "Bullish"
     elif total <= -2: label = "Bearish"
-    else: label = "Neutral" # Pokrývá 1, 0, -1
+    else: label = "Neutral"
     return total, label
 
-# ZMĚNA AI shrnutí - detailnější rozbor
-def generate_ai_summary(summary_df, final_score, overall_label, category_frames):
-    summary = []
-    
-    # 1. Úvodní shrnutí
-    summary.append(f"Celkové fundamentální skóre pro USD za poslední 3 měsíce (manuálně zadaná data) dosáhlo hodnoty **{final_score:+d}**, což signalizuje **{overall_label}** sentiment.")
-    
-    # 2. Detailní rozbor kategorií
-    for cat, df_cat_scored in category_frames.items():
-        total, label = evaluate_category(df_cat_scored)
-        count = len(df_cat_scored)
-        
-        if count > 0:
-            if label == "Bullish":
-                summary.append(f"**{cat}**: Tato kategorie ({count} zpráv) vykazuje silně **{label}** skóre **({total:+d} bodů)**. Většina reportů v této oblasti překonala tržní očekávání, což poskytuje USD silný býčí fundamentální impuls.")
-            elif label == "Bearish":
-                summary.append(f"**{cat}**: Zde ({count} zpráv) dominuje **{label}** sentiment s **({total:+d} bodů)**. Data zaostala za konsenzem, což působí jako hlavní fundamentální tlak proti USD.")
-            else:
-                summary.append(f"**{cat}**: Tato kategorie ({count} zpráv) je **{label}** ({total:+d} bodů). Pozitivní a negativní zprávy se vzájemně vyrovnaly, což ukazuje na vyvážený výhled v tomto sektoru ekonomiky.")
-        else:
-            summary.append(f"**{cat}**: V této kategorii nebyly v daném období nalezeny žádné proběhlé High-Impact události pro scoring.")
+# ZJEDNODUŠENÉ AI shrnutí (Původní verze bez detailního rozboru)
+def generate_ai_summary(summary_df, final_score, overall_label):
+    summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce dosáhlo hodnoty {final_score:+d}, což signalizuje {overall_label} sentiment. Analýza kategorií ukazuje, že hlavní vliv mají sektory s nejvyšším bodovým ziskem, zatímco negativní tlaky pocházejí ze slabších reportů."
+    return summary
 
-    # 3. Závěr
-    if overall_label == "Bullish pro USD":
-        summary.append("Celkový býčí sentiment je tažen zejména silnými daty z klíčových oblastí, které převážily mírně negativní zprávy. Toto silné fundamentální podhoubí naznačuje potenciál pro další posilování dolaru.")
-    elif overall_label == "Bearish pro USD":
-        summary.append("Celková medvědí nálada je způsobena kumulací slabších výsledků napříč hlavními sektory. Tento fundamentální tlak může signalizovat překážky pro Fed nebo ekonomiku jako celek, což by mohlo vést k oslabení USD.")
-    else:
-        summary.append("Celkový neutralní výsledek poukazuje na vyváženou situaci, kdy se pozitivní a negativní fundamenty navzájem vyrušily. Trh tak nemá jasný fundamentální směr z makrodat.")
-
-    return "\n\n".join(summary).replace('**', '')
-
-# Funkce pro stylování Pandas DataFrame (Nativní Streamlit styly)
+# Funkce pro stylování Pandas DataFrame
 def color_points_basic(val):
     val = pd.to_numeric(val, errors='coerce')
     if val > 0:
@@ -210,12 +220,13 @@ def color_points_basic(val):
 # BUILD DASHBOARD
 # -------------------------
 
-# 1. HLAVNÍ TITULEK A MOTTO
+# 1. HLAVNÍ TITULEK A MOTTO (Sekce #0C0C0C)
+st.markdown("<div class='section-black'>", unsafe_allow_html=True)
 st.title("USD Macro AI Dashboard")
 st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
-# 2. SKRYTÍ SEKCE Data fetch & processing (pouze načítání)
+# Načítání dat
 with st.spinner(f"Načítám data z lokálního souboru '{CSV_FILE_PATH}'..."):
     df_high = load_events_from_csv()
 
@@ -226,13 +237,14 @@ if df_high.empty:
 df_high["Points"] = df_high.apply(score_event, axis=1)
 df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 
-# Filtrace: pouze události s Actual hodnotou (proběhlé)
 df_scored = df_high[pd.to_numeric(df_high['Actual'], errors='coerce').notna()].copy()
 df_all_display = df_high.copy()
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
 
 # -------------------------
-# 3. ROZDĚLENÍ FUNDAMENTÁLNÍCH ZPRÁV DO KATEGORIÍ
+# 3. ROZDĚLENÍ FUNDAMENTÁLNÍCH ZPRÁV DO KATEGORIÍ (Sekce #F2EEDB)
 # -------------------------
+st.markdown("<div class='section-cream'>", unsafe_allow_html=True)
 st.header("Rozdělení fundamentálních zpráv do kategorií")
 cols = st.columns(2)
 
@@ -251,7 +263,6 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Stylování bodů
     styled_df = display_df.style.applymap(color_points_basic, subset=['Points'])
     
     if i % 2 == 0:
@@ -262,19 +273,18 @@ for i, cat in enumerate(unique_categories):
         with cols[1]:
             st.subheader(cat)
             st.dataframe(styled_df, use_container_width=True)
-
-st.markdown("---")
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
 
 # -------------------------
-# 4. VYHODNOCENÍ FUNDAMENTU A AI ANALÝZA (KONZOLIDACE)
+# 4. VYHODNOCENÍ FUNDAMENTU A AI ANALÝZA (Sekce #0C0C0C)
 # -------------------------
+st.markdown("<div class='section-black'>", unsafe_allow_html=True)
 st.header("Vyhodnocení fundamentu") 
 
 summary_rows = []
 total_combined_score = 0
 
 for cat, df_cat in category_frames.items():
-    # Používáme novou logiku evaluate_category
     total, label = evaluate_category(df_cat)
     total_combined_score += total
     summary_rows.append({
@@ -287,35 +297,28 @@ for cat, df_cat in category_frames.items():
 summary_df = pd.DataFrame(summary_rows)
 final_score = total_combined_score
 
-# Aplikujeme novou logiku bodování na finální skóre
 if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-# Odstranění "Category summary" - zobrazujeme pouze data
-# Zobrazení standardní tabulky pro stabilitu
+# Zobrazení standardní tabulky (bez "Category summary")
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
-# KONZOLIDACE: Celkové skóre + AI Vyhodnocení v jednom bloku
-# Podtržení Celkového skóre (pomocí CSS třídy score-line)
-st.markdown(f"<div class='score-line'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</div>", unsafe_allow_html=True)
+# Podtržení Celkového skóre (v Black sekci, text je CREAM)
+st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</div>", unsafe_allow_html=True)
 
-# AI Vyhodnocení (bílý text, obrys modrého čtverce, delší text)
-ai_text_content = generate_ai_summary(summary_df, final_score, final_label, category_frames)
+# AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
 st.subheader("AI Fundamentální Vyhodnocení")
-
-# Použití st.info s upraveným CSS pro stylizovaný box
+ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
 st.info(ai_text_content)
-
-
-st.markdown("---")
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
 
 # -------------------------
-# 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ
+# 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ (Sekce #F2EEDB)
 # -------------------------
+st.markdown("<div class='section-cream'>", unsafe_allow_html=True)
 st.header("Graf fundamentálních kategorií") 
 
-# GRAF: Používá df_scored pro zobrazení pouze proběhlých událostí
 viz_df = df_scored.copy() 
 viz_df["DateSimple"] = viz_df["DateParsed"].dt.date
 viz_agg = viz_df.groupby(["DateSimple","Category"])["Points"].sum().reset_index()
@@ -324,23 +327,26 @@ if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Body podle kategorie v čase (denní agregát z proběhlých událostí)")
     
-    # Úprava grafu pro tmavé pozadí a lepší čitelnost
+    # Úprava grafu pro CREAM pozadí sekce, ale plot musí být čitelný
     fig.update_layout(
-        plot_bgcolor='#1a1a1a', 
-        paper_bgcolor='#1a1a1a', 
-        font_color='#FAFAFA'
+        plot_bgcolor='#eeeeee', 
+        paper_bgcolor={BG_CREAM},
+        font_color={TEXT_BLACK},
+        title_font_color={TEXT_BLACK}
     )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Není dost dat pro graf.")
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
     
 # -------------------------
-# 6. Export
+# 6. Export (Sekce #0C0C0C)
 # -------------------------
-st.markdown("---")
+st.markdown("<div class='section-black'>", unsafe_allow_html=True)
 st.header("Export / download")
 
 csv_all = df_high.sort_values("DateParsed", ascending=False)[
     ["DateDisplay","Category","Report","Actual","Forecast","Previous","Points"]
 ].rename(columns={"DateDisplay":"Date"})
 st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_manual.csv", "text/csv")
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
