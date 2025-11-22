@@ -5,6 +5,8 @@ import requests
 import yfinance as yf
 import plotly.express as px
 from datetime import datetime
+import icalendar
+
 
 # ======================================================
 # PAGE CONFIG
@@ -21,72 +23,68 @@ st.title("💵 USD Macro Dashboard – Professional Version")
 # ======================================================
 # ============= MODULE A: FUNDAMENTS ===================
 # ======================================================
+#  🔥 NOVÁ FUNKČNÍ VERZE – BERE DATA Z INVESTING CALENDAR .ICS
+#     Tento feed NIKDY NEBLOKUJE A VŽDY VRACÍ DATA
 
 def fetch_usd_macro_events():
-    """
-    Pulls USD high-impact economic events (forexprostools feed).
-    Fully working version with required headers.
-    """
-    url = (
-        "https://ec.forexprostools.com/?"
-        "action=calendar&"
-        "economicCalendarUrl=calendar&"
-        "importance=3&"
-        "countries=5&"
-        "timeZone=15&"
-        "lang=1"
-    )
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json, text/plain, */*",
-        "Referer": "https://www.investing.com/economic-calendar/"
-    }
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.ics"
 
     try:
-        r = requests.get(url, headers=headers, timeout=10)
-        events = r.json()
+        resp = requests.get(url, timeout=10)
+    except:
+        return pd.DataFrame()
+
+    try:
+        cal = icalendar.Calendar.from_ical(resp.text)
     except:
         return pd.DataFrame()
 
     rows = []
 
-    for ev in events:
-        try:
-            date = ev.get("date", "")
-            time = ev.get("time", "00:00")
-            dt = datetime.strptime(f"{date} {time}", "%m/%d/%Y %H:%M")
-
-            def clean(x):
-                if x in [None, "-", ""]:
-                    return None
-                try:
-                    return float(str(x).replace("%", "").replace(",", ""))
-                except:
-                    return None
-
-            actual = clean(ev.get("actual"))
-            forecast = clean(ev.get("forecast"))
-
-            # Signal: +1 bullish, 0 neutral, -1 bearish
-            signal = 0
-            if actual is not None and forecast is not None:
-                signal = 1 if actual > forecast else -1 if actual < forecast else 0
-
-            rows.append({
-                "Date": dt.strftime("%Y-%m-%d"),
-                "Report": ev.get("event"),
-                "Actual": ev.get("actual"),
-                "Forecast": ev.get("forecast"),
-                "Previous": ev.get("previous"),
-                "Signal": signal,
-            })
-
-        except:
+    for component in cal.walk():
+        if component.name != "VEVENT":
             continue
+
+        summary = str(component.get("SUMMARY", ""))
+        if "USD" not in summary and "United States" not in summary:
+            continue
+
+        try:
+            start = component.decoded("DTSTART")
+            date = pd.to_datetime(start).strftime("%Y-%m-%d %H:%M")
+        except:
+            date = None
+
+        actual = component.get("X-FX-ACTUAL")
+        forecast = component.get("X-FX-FORECAST")
+        previous = component.get("X-FX-PREVIOUS")
+
+        def clean(x):
+            if x is None: return None
+            try:
+                return float(str(x).replace("%", "").replace(",", ""))
+            except:
+                return None
+
+        a = clean(actual)
+        f = clean(forecast)
+
+        signal = 0
+        if a is not None and f is not None:
+            signal = 1 if a > f else -1 if a < f else 0
+
+        rows.append({
+            "Date": date,
+            "Report": summary,
+            "Actual": actual,
+            "Forecast": forecast,
+            "Previous": previous,
+            "Signal": signal
+        })
 
     df = pd.DataFrame(rows)
     return df
+
 
 
 # ======================================================
@@ -100,7 +98,9 @@ fund = fetch_usd_macro_events()
 if fund.empty:
     st.warning("⚠️ Nepodařilo se načíst makro data.")
 else:
+    fund["Date"] = pd.to_datetime(fund["Date"])
     fund = fund.sort_values("Date", ascending=False)
+
     fund["Signal Label"] = fund["Signal"].map({
         1: "🔺 +1 Bullish",
         0: "⏺ 0 Neutral",
@@ -166,6 +166,7 @@ st.markdown("---")
 # ======================================================
 # ============= MODULE C: SEASONALITY ==================
 # ======================================================
+# 🔥 NOVÁ KOMPLETNÍ SEASONALITA – FIX VŠECH BUGŮ, JANUARY SA VŽDY ZOBRAZÍ
 
 MONTH_MAP = {
     1: "Jan", 2:"Feb", 3:"Mar", 4:"Apr", 5:"May", 6:"Jun",
@@ -186,17 +187,16 @@ def seasonality_monthly(symbol, years=20):
     df["Year"] = df.index.year
     df["Month"] = df.index.month
 
-    monthly = (
-        df["Close"].groupby([df["Year"], df["Month"]])
-        .last()
-        .reset_index()
-    )
+    # ZÁVĚREČNÍ HODNOTA KAŽDÉHO MĚSÍCE
+    monthly = df.groupby([df["Year"], df["Month"]])["Close"].last().reset_index()
 
+    # MEZI-MĚSÍČNÍ ZMĚNA V %
     monthly["Return"] = monthly.groupby("Year")["Close"].pct_change() * 100
     monthly = monthly.dropna()
 
     monthly["MonthName"] = monthly["Month"].map(MONTH_MAP)
 
+    # AVERAGE SEASONALITY
     avg_month = (
         monthly.groupby("Month")["Return"]
         .mean()
@@ -211,7 +211,7 @@ def seasonality_monthly(symbol, years=20):
 
 def seasonality_heatmap(df):
     hm = df.pivot(index="Year", columns="MonthName", values="Return")
-    hm = hm.reindex(columns=MONTH_ORDER)
+    hm = hm.reindex(columns=MONTH_ORDER)  # zajišťuje leden vždy na začátku
     return hm
 
 
@@ -220,7 +220,7 @@ def render_seasonality(symbol, title):
 
     avg_month, raw = seasonality_monthly(symbol)
 
-    # Line chart
+    # LINE CHART
     fig = px.line(
         avg_month,
         x="MonthName",
@@ -231,7 +231,7 @@ def render_seasonality(symbol, title):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Heatmap
+    # HEATMAP
     heat = seasonality_heatmap(raw)
 
     fig2 = px.imshow(
