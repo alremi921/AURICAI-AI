@@ -8,13 +8,13 @@ from datetime import datetime, timedelta
 import plotly.express as px
 
 st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
-st.title("💵 USD Macro AI Dashboard — Category Scoring (last 30 days)")
+st.title("💵 USD Macro AI Dashboard — Category Scoring (last 6 months)")
 
 # -------------------------
 # CONFIG
 # -------------------------
-# how far back (days) - ZMĚNA na 30 dní
-LOOKBACK_DAYS = 30
+# how far back (days) - NÁVRAT na 180 dní (~6 měsíců)
+LOOKBACK_DAYS = 180
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
 
@@ -56,14 +56,14 @@ def clean_num(x):
     if x is None:
         return None
     s = str(x).strip()
-    # OČISTNÁ ZMĚNA: Odstranění nežádoucího symbolu bodu (tečky) na začátku
+    # Robustní čištění: odstranění tečky na začátku, pokud tam je
     if s.startswith('.'):
          s = s[1:]
     
-    if s == "" or s == "-" or s.lower() == "n/a":
+    if s == "" or s == "-" or s.lower() == "n/a" or s.lower() == "nan":
         return None
-    # remove % and commas
-    s = s.replace("%", "").replace(",", "")
+    # remove % and commas and K/M/B (if they exist)
+    s = s.replace("%", "").replace(",", "").replace("K", "000").replace("M", "000000").replace("B", "000000000")
     try:
         return float(s)
     except:
@@ -72,7 +72,7 @@ def clean_num(x):
 # Try to fetch weekly JSON (current week)
 def fetch_json(url):
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(url, timeout=20) # Zvýšený timeout
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -82,7 +82,7 @@ def fetch_json(url):
 # Fetch XML and parse events
 def fetch_xml(url):
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(url, timeout=20) # Zvýšený timeout
         if r.status_code == 200:
             return r.text
     except Exception:
@@ -128,10 +128,9 @@ def parse_faireconomy_xml(xml_text):
     if not xml_text:
         return rows
     try:
-        # PŘIDÁNO: Zkusit odstranit nečisté znaky před <root> nebo <events>
+        # Vylepšené čištění XML textu
         xml_text = xml_text.strip()
         if not xml_text.startswith('<'):
-            # Najdi první znak '<' a začni od něj, pokud to není validní XML
             xml_text = '<root>' + xml_text.split('<', 1)[1] if '<' in xml_text else xml_text
             if not xml_text.endswith('>'):
                  xml_text += '</root>'
@@ -139,7 +138,7 @@ def parse_faireconomy_xml(xml_text):
         root = ET.fromstring(xml_text)
     except Exception:
         return rows
-    # xml structure: <event> elements
+    
     for event in root.findall(".//event"):
         try:
             title = event.findtext("title") or ""
@@ -170,9 +169,11 @@ def parse_faireconomy_xml(xml_text):
                     dt_str = dt.strftime("%Y-%m-%d %H:%M")
                 except:
                     dt_str = None
-            forecast = event.findtext("forecast")
-            actual = event.findtext("actual")
-            previous = event.findtext("previous")
+            
+            # PŘIDANÁ KONTROLA: zajištění, že Actual/Forecast jsou správně uchopeny
+            forecast = event.findtext("forecast") or ""
+            actual = event.findtext("actual") or ""
+            previous = event.findtext("previous") or ""
             
             rows.append({
                 "Date": dt_str,
@@ -187,9 +188,8 @@ def parse_faireconomy_xml(xml_text):
             continue
     return rows
 
-# ZMĚNA: Použití st.cache_data s TTL pro automatické obnovení po 4 hodinách
-@st.cache_data(ttl=4 * 3600) # Automatické obnovení dat každé 4 hodiny (4 * 3600 sekund)
-def collect_events_data():
+# Collect events from multiple sources for the last 6 months (weekly crawl)
+def collect_events_6mo():
     all_rows = []
 
     # 1) Try the canonical JSON endpoint for current & near weeks
@@ -206,8 +206,8 @@ def collect_events_data():
             rows = parse_faireconomy_xml(xml_text)
             all_rows.extend(rows)
 
-    # 3) Iterate backward weekly (4 týdny ~ 1 měsíc)
-    weeks = 4
+    # 3) As a robust attempt: iterate backward weekly and try to fetch weekly JSON by passing date param (We'll attempt for up to 26 weeks)
+    weeks = 26
     for w in range(weeks):
         target = TODAY - timedelta(weeks=w)
         # try a few URL templates
@@ -234,14 +234,13 @@ def collect_events_data():
                             all_rows.extend(rows)
             except Exception:
                 continue
-    
     # deduplicate by Report + Date
     df = pd.DataFrame(all_rows)
     if df.empty:
         return df
     # normalize Date to datetime when possible
     df["DateParsed"] = pd.to_datetime(df["Date"], errors="coerce")
-    # only keep within lookback window (30 dní)
+    # only keep within lookback window
     df = df[df["DateParsed"].notna()]
     df = df[df["DateParsed"] >= pd.Timestamp(START_DATE)]
     df = df.sort_values("DateParsed", ascending=False)
@@ -276,7 +275,7 @@ def evaluate_category(df_cat):
 
 # NOVÁ FUNKCE: AI-style vyhodnocení
 def generate_ai_summary(summary_df, final_score, overall_label):
-    summary = f"Celkové fundamentální skóre pro USD za poslední měsíc (30 dní) je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
+    summary = f"Celkové fundamentální skóre pro USD za posledních 6 měsíců je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
     
     # Seřazení kategorií podle skóre
     sorted_summary = summary_df.sort_values("Total Points", ascending=False)
@@ -301,12 +300,13 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 
     return summary
 
+
 # -------------------------
 # BUILD DASHBOARD
 # -------------------------
 st.header("Data fetch & processing")
 with st.spinner(f"Stahuji a zpracovávám ekonomické události (posledních ~{LOOKBACK_DAYS} dní)..."):
-    df_all = collect_events_data()
+    df_all = collect_events_6mo()
 
 if df_all.empty:
     st.error("Nepodařilo se stáhnout žádné události z ekonomického kalendáře. Zkus znovu nebo zkontroluj konektivitu.")
@@ -330,7 +330,7 @@ df_high["Points"] = df_high.apply(score_event, axis=1)
 df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 
 # Show counts
-st.success(f"Nalezeno {len(df_high)} high-impact událostí v cílových kategoriích za posledních {LOOKBACK_DAYS} dní. Data se automaticky aktualizují každé 4 hodiny.")
+st.success(f"Nalezeno {len(df_high)} high-impact událostí v cílových kategoriích za posledních {LOOKBACK_DAYS} dní.")
 
 # -------------------------
 # Create per-category tables
@@ -430,9 +430,10 @@ st.markdown("Stáhni data pro další analýzu:")
 csv_all = df_high.sort_values("DateParsed", ascending=False)[
     ["DateDisplay","Category","Report","Actual","Forecast","Previous","Points"]
 ].rename(columns={"DateDisplay":"Date"})
-st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_30d.csv", "text/csv")
+st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_6mo.csv", "text/csv")
 
 # summary CSV
 st.download_button("Download summary CSV", summary_df.to_csv(index=False).encode("utf-8"), "usd_macro_summary.csv", "text/csv")
 
-st.success("Hotovo — dashboard aktualizován a zaměřen na spolehlivost dat za poslední měsíc. Zkus znovu spustit.")
+st.error("DŮLEŽITÉ: Pokud ani teď nevidíš 'Actual' hodnoty pro starší zprávy, znamená to, že je zdroj dat (API) neposkytuje. V takovém případě je nutné najít jiný, spolehlivější zdroj historických dat.")
+st.success("Hotovo — zkus znovu spustit.")
