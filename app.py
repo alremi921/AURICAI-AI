@@ -41,10 +41,10 @@ st.markdown(f"""
 /* 3. Stylování nadpisů */
 /* HLAVNÍ NADPIS: Auricai AI */
 h1 {{
-    font-family: 'Libre Baskerville', serif !important; /* Náhrada za BASKERVILLE DISPLAY PT */
+    font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
     color: {TEXT_CREAM};
-    font-weight: 700;
+    font-weight: 300; /* ZMĚNA: Montserrat Light */
     text-transform: uppercase;
     letter-spacing: 5px;
     margin-top: 10px;
@@ -79,6 +79,7 @@ p, div, label {{
     letter-spacing: 3px;
     margin-top: -10px;
     font-size: 1.1em;
+    text-align: center; /* ZAROVNÁNÍ MOTTA NA STŘED */
 }}
 
 /* Nastavení barvy textu v krémových sekcích */
@@ -86,7 +87,7 @@ p, div, label {{
     color: {TEXT_BLACK}; 
 }}
 
-/* ZMĚNA: Stylování Tabulek - OSTRÉ HRANY A KRÉMOVÉ POZADÍ */
+/* ZMĚNA: Stylování Tabulek - NÁVRAT KE STABILNÍMU STYLU st.table */
 .stDataFrame, .stTable {{
     margin-left: auto;
     margin-right: auto;
@@ -95,7 +96,7 @@ p, div, label {{
     background-color: transparent !important;
 }}
 
-/* Cílení na BUŇKY a HLAVIČKY */
+/* Cílení na BUŇKY a HLAVIČKY - Zajištění krémového pozadí */
 .stDataFrame table thead th, .stDataFrame table tbody td, 
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
@@ -103,11 +104,15 @@ p, div, label {{
     border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
 }}
+.stTable table {{
+    background-color: {BG_CREAM} !important;
+}}
+
 
 /* *** KRITICKÁ OPRAVA: AI BOX (st.info) - ZRUŠIT MODROU VÝPLŇ *** */
 div[data-testid="stAlert"] {{
     background-color: {BG_BLACK} !important; 
-    border: 1px solid {TEXT_CREAM} !important; /* Nová krémová barva obrysu */
+    border: 1px solid {TEXT_CREAM} !important; /* Krémový obrys */
     color: {TEXT_CREAM} !important; 
     padding: 20px;
     margin-top: 10px;
@@ -216,30 +221,22 @@ def evaluate_category(df_cat):
     else: label = "Neutral"
     return total, label
 
-# ZMĚNA: PRODLOUŽENÉ AI shrnutí (4-8 vět)
+# ZMĚNA: ZKRÁCENÉ AI shrnutí (cca 3-4 věty)
 def generate_ai_summary(summary_df, final_score, overall_label):
     
-    # 1. Celkový stav
-    summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce dosáhlo hodnoty {final_score:+d}, což signalizuje **{overall_label}** sentiment pro americký dolar. Toto hodnocení je výsledkem vyváženého souboru High-Impact zpráv napříč čtyřmi klíčovými makroekonomickými kategoriemi. "
-    
-    # 2. Silné a slabé stránky
     strongest = summary_df.sort_values('Total Points', ascending=False).iloc[0]
     weakest = summary_df.sort_values('Total Points', ascending=True).iloc[0]
     
+    summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce dosáhlo hodnoty {final_score:+d}, což signalizuje **{overall_label}** sentiment pro americký dolar. "
+    
     if strongest['Total Points'] > 0:
-        summary += f"Nejsilnější podporu dolaru poskytla kategorie **{strongest['Category']}** s kumulativním skóre {strongest['Total Points']:+d}. To naznačuje, že zprávy jako {strongest['Category']} pravidelně překonávají očekávání trhu, což je klíčové pro silnou měnu. "
+        summary += f"Nejsilnější podporu poskytla kategorie **{strongest['Category']}** ({strongest['Total Points']:+d}), kde reporty konzistentně překonávaly očekávání. "
     
     if weakest['Total Points'] < 0:
-        summary += f"Naopak, nejslabším článkem se ukázala být kategorie **{weakest['Category']}** se skóre {weakest['Total Points']:+d}. Výsledky v této oblasti naznačují, že aktuální data zaostávají za konsenzem, což působí jako brzda. "
-    
-    # 3. Závěr
-    if overall_label == "Bullish":
-        summary += "I přes jisté slabiny převažuje optimismus. Silné makrodata by mohla nadále podporovat jestřábí postoj Federálního rezervního systému (FED). "
-    elif overall_label == "Bearish":
-        summary += "Trvalé negativní skóre ve více kategoriích vytváří medvědí výhled. Investoři by měli sledovat, zda se trend slabosti v nejvíce zasažených sektorech nezhorší. "
-    else:
-        summary += "Neutrální skóre naznačuje, že pozitivní a negativní fundamenty se efektivně vyrovnávají, a trh aktuálně postrádá jasný směr z makrodat. "
+        summary += f"Negativní tlak na dolar přichází ze sektoru **{weakest['Category']}** ({weakest['Total Points']:+d}). "
         
+    summary += "Celkově se jedná o vyváženou situaci s jasnými silnými a slabými stránkami, které by měl investor sledovat."
+    
     return summary
 
 # Funkce pro stylování Pandas DataFrame
@@ -248,7 +245,6 @@ def color_points_basic(val):
     # Ostré krémové buňky
     style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};' 
     if val > 0:
-        # Použijeme bílou barvu textu jen pro barevné skóre, jinak krémovou
         style = 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
     elif val < 0:
         style = 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
@@ -260,10 +256,11 @@ def color_points_basic(val):
 
 # 1. HLAVNÍ TITULEK A MOTTO (Sekce #0C0C0C)
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-# Malý horní nadpis
+# Malý horní nadpis (Montserrat Light, Uppercase)
 st.markdown("<p class='small-title'>USD MACRO AI DASHBOARD</p>", unsafe_allow_html=True) 
-# Hlavní nadpis
+# Hlavní nadpis (Montserrat Light, Uppercase)
 st.title("AURICAI AI")
+# Motto (Libre Baskerville)
 st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
@@ -304,7 +301,7 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Stylování bodů: Použijeme st.table pro jednotný design
+    # Používáme st.table s Pandas Styler pro zachování barevnosti
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
@@ -345,7 +342,7 @@ else: final_label = "Neutral pro USD"
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
-st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</div>", unsafe_allow_html=True)
 
 # AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
 st.subheader("AI Fundamentální Vyhodnocení")
