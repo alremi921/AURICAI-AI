@@ -7,70 +7,99 @@ import plotly.express as px
 import os 
 
 # -------------------------
-# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA
+# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA (Old Money Style)
 # -------------------------
 st.markdown("""
 <style>
-/* 1. Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300&display=swap');
-/* NORWESTER a KOLLEKTIF jsou custom fonts, které musí být definovány externě nebo se použije fallback */
+/* 1. Import Google Fonts (Fallback a Montserrat) */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400&display=swap');
 
-/* Zajištění načtení fontů Norwester a Kollektif (pokud jsou k dispozici, jinak fallback) */
+/* Definice custom fontů (Zajištění stability: používáme fallback) */
 @font-face {
-    font-family: 'Norwester';
-    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/norwester/Norwester-Regular.ttf') format('truetype');
+    font-family: 'The Seasons';
+    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Regular.ttf') format('truetype'); /* Použijeme stabilní Montserrat Regular jako placeholder/fallback */
+    font-weight: 400;
 }
 @font-face {
-    font-family: 'Kollektif Regular';
-    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/kollektif/Kollektif-Regular.ttf') format('truetype');
+    font-family: 'Beautifully Delicious Light';
+    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Light.ttf') format('truetype'); /* Použijeme stabilní Montserrat Light jako placeholder/fallback */
+    font-weight: 300;
 }
+
 
 /* 2. Streamlit celkové nastavení */
 .stApp {
     padding-top: 20px;
-    background-color: #131317; /* Washed Black pozadí */
+    background-color: #0C0C0C; /* Washed Black pozadí (0C0C0C) */
     color: #FAFAFA;
 }
 
-/* 3. Stylování nadpisů (Font Oswald/Kollektif) */
+/* 3. Stylování nadpisů */
+/* Hlavní nadpis H1: The Seasons (Regular) */
 h1 {
-    font-family: 'Norwester', sans-serif !important; /* Hlavní nadpis - Norwester */
+    font-family: 'The Seasons', 'Montserrat', sans-serif !important; 
     text-align: center;
     color: #FAFAFA;
-    text-transform: uppercase;
-}
-h2, h3, h4 {
-    font-family: 'Kollektif Regular', sans-serif !important; /* Ostatní nadpisy - Kollektif */
-    text-align: center;
-    color: #FAFAFA;
+    font-weight: 400; /* Regular/Semi-bold */
+    letter-spacing: 2px;
 }
 
-/* 4. Stylování textu a motta (Font Montserrat Light) */
-p, div, .stMarkdown, label {
-    font-family: 'Montserrat', sans-serif !important;
+/* Ostatní nadpisy H2, H3: Beautifully Delicious Light */
+h2, h3, h4 {
+    font-family: 'Beautifully Delicious Light', 'Montserrat', sans-serif !important; 
+    text-align: center;
+    color: #FAFAFA;
     font-weight: 300; /* Light */
 }
-.stMarkdown {
-    text-align: center;
+
+/* Nadpis pro tabulky (Trh práce, Inflace atd.) */
+h3 {
+    font-family: 'Beautifully Delicious Light', 'Montserrat', sans-serif !important; 
 }
 
-/* Centrování hlavních prvků (Streamlit workarounds) */
-section[data-testid="stSidebar"] + div h3 {
+
+/* 4. Stylování textu a motta */
+p, div, label, .stMarkdown {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 300; /* Light */
     text-align: center;
 }
+/* Motto - Montserrat Light, Velká písmena */
+.motto {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 300; 
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-top: -10px; /* Přiblížení k hlavnímu nadpisu */
+    font-size: 1.1em;
+}
 
-/* Stylování pro tabulky a infobox (aby sedělo k tmavému pozadí) */
+/* 5. Stylování tabulek a boxů (Ostré rohy, Washed Black pozadí) */
 .stDataFrame, .stTable {
     margin-left: auto;
     margin-right: auto;
     background-color: #1a1a1a;
-    border-radius: 8px;
+    border-radius: 0px; /* Ostré rohy */
+    border: 1px solid #333333;
 }
-.stAlert {
-    background-color: #222233;
-    color: #FAFAFA;
-    border-color: #444466;
+
+/* Úprava AI boxu: odstraňujeme modré pozadí, ponecháváme bílý text a obrys */
+div[data-testid="stAlert"] {
+    background-color: transparent !important; /* Průhledné pozadí */
+    border: 1px solid #4A4A99 !important; /* Jemný modrý obrys */
+    color: #FAFAFA !important; /* Bílý text */
 }
+
+/* Podtržení Celkového skóre */
+.score-line {
+    border-bottom: 1px solid #666666;
+    padding-bottom: 5px;
+    display: inline-block;
+    font-size: 1.5em;
+    font-weight: 400; /* Regular */
+    margin-bottom: 15px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -136,28 +165,37 @@ def evaluate_category(df_cat):
     else: label = "Neutral" # Pokrývá 1, 0, -1
     return total, label
 
-# AI shrnutí
-def generate_ai_summary(summary_df, final_score, overall_label):
-    summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce (manuálně zadaná data) je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
+# ZMĚNA AI shrnutí - detailnější rozbor
+def generate_ai_summary(summary_df, final_score, overall_label, category_frames):
+    summary = []
     
-    summary_df_scored = summary_df[summary_df['Events Count'] > 0]
+    # 1. Úvodní shrnutí
+    summary.append(f"Celkové fundamentální skóre pro USD za poslední 3 měsíce (manuálně zadaná data) dosáhlo hodnoty **{final_score:+d}**, což signalizuje **{overall_label}** sentiment.")
     
-    if not summary_df_scored.empty:
-        sorted_summary = summary_df_scored.sort_values("Total Points", ascending=False)
-        best_cat = sorted_summary.iloc[0]
-        if best_cat['Total Points'] > 0:
-            summary += f"Nejsilnější pozitivní vliv na USD má kategorie **{best_cat['Category']}** s výsledkem **{best_cat['Total Points']:+d} bodů** ({best_cat['Events Count']} proběhlých událostí). "
+    # 2. Detailní rozbor kategorií
+    for cat, df_cat_scored in category_frames.items():
+        total, label = evaluate_category(df_cat_scored)
+        count = len(df_cat_scored)
         
-        worst_cat = sorted_summary.iloc[-1]
-        if worst_cat['Total Points'] < 0:
-            summary += f"Negativně působí kategorie **{worst_cat['Category']}** se skóre **{worst_cat['Total Points']:+d} bodů** ({worst_cat['Events Count']} proběhlých událostí). "
-    
+        if count > 0:
+            if label == "Bullish":
+                summary.append(f"**{cat}**: Tato kategorie ({count} zpráv) vykazuje silně **{label}** skóre **({total:+d} bodů)**. Většina reportů v této oblasti překonala tržní očekávání, což poskytuje USD silný býčí fundamentální impuls.")
+            elif label == "Bearish":
+                summary.append(f"**{cat}**: Zde ({count} zpráv) dominuje **{label}** sentiment s **({total:+d} bodů)**. Data zaostala za konsenzem, což působí jako hlavní fundamentální tlak proti USD.")
+            else:
+                summary.append(f"**{cat}**: Tato kategorie ({count} zpráv) je **{label}** ({total:+d} bodů). Pozitivní a negativní zprávy se vzájemně vyrovnaly, což ukazuje na vyvážený výhled v tomto sektoru ekonomiky.")
+        else:
+            summary.append(f"**{cat}**: V této kategorii nebyly v daném období nalezeny žádné proběhlé High-Impact události pro scoring.")
+
+    # 3. Závěr
     if overall_label == "Bullish pro USD":
-        summary += "Fundamentální býčí sentiment je tažen silnými daty, která převážila mírně negativní zprávy. "
+        summary.append("Celkový býčí sentiment je tažen zejména silnými daty z klíčových oblastí, které převážily mírně negativní zprávy. Toto silné fundamentální podhoubí naznačuje potenciál pro další posilování dolaru.")
     elif overall_label == "Bearish pro USD":
-        summary += "Celková medvědí nálada je způsobena kumulací slabších výsledků. "
-    else: summary += "Celkový neutralní výsledek poukazuje na vyváženou situaci. "
-    return summary
+        summary.append("Celková medvědí nálada je způsobena kumulací slabších výsledků napříč hlavními sektory. Tento fundamentální tlak může signalizovat překážky pro Fed nebo ekonomiku jako celek, což by mohlo vést k oslabení USD.")
+    else:
+        summary.append("Celkový neutralní výsledek poukazuje na vyváženou situaci, kdy se pozitivní a negativní fundamenty navzájem vyrušily. Trh tak nemá jasný fundamentální směr z makrodat.")
+
+    return "\n\n".join(summary).replace('**', '')
 
 # Funkce pro stylování Pandas DataFrame (Nativní Streamlit styly)
 def color_points_basic(val):
@@ -174,7 +212,7 @@ def color_points_basic(val):
 
 # 1. HLAVNÍ TITULEK A MOTTO
 st.title("USD Macro AI Dashboard")
-st.markdown("#### *BEAT THE ODDS*", unsafe_allow_html=True) 
+st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
 # 2. SKRYTÍ SEKCE Data fetch & processing (pouze načítání)
@@ -249,20 +287,25 @@ for cat, df_cat in category_frames.items():
 summary_df = pd.DataFrame(summary_rows)
 final_score = total_combined_score
 
-# Znovu aplikujeme novou logiku bodování na finální skóre
+# Aplikujeme novou logiku bodování na finální skóre
 if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-st.subheader("Category summary") 
-
-# Zobrazení standardní, nestylované tabulky pro stabilitu
+# Odstranění "Category summary" - zobrazujeme pouze data
+# Zobrazení standardní tabulky pro stabilitu
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # KONZOLIDACE: Celkové skóre + AI Vyhodnocení v jednom bloku
-st.markdown(f"### Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**")
+# Podtržení Celkového skóre (pomocí CSS třídy score-line)
+st.markdown(f"<div class='score-line'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</div>", unsafe_allow_html=True)
+
+# AI Vyhodnocení (bílý text, obrys modrého čtverce, delší text)
+ai_text_content = generate_ai_summary(summary_df, final_score, final_label, category_frames)
 st.subheader("AI Fundamentální Vyhodnocení")
-st.info(generate_ai_summary(summary_df, final_score, final_label).replace('**', ''))
+
+# Použití st.info s upraveným CSS pro stylizovaný box
+st.info(ai_text_content)
 
 
 st.markdown("---")
@@ -281,7 +324,7 @@ if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Body podle kategorie v čase (denní agregát z proběhlých událostí)")
     
-    # Úprava grafu pro tmavé pozadí
+    # Úprava grafu pro tmavé pozadí a lepší čitelnost
     fig.update_layout(
         plot_bgcolor='#1a1a1a', 
         paper_bgcolor='#1a1a1a', 
