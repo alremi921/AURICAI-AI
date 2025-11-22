@@ -12,52 +12,65 @@ import os
 st.markdown("""
 <style>
 /* 1. Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Source+Sans+Pro:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300&display=swap');
+/* NORWESTER a KOLLEKTIF jsou custom fonts, které musí být definovány externě nebo se použije fallback */
 
-/* Streamlit standardní tmavé téma je zachováno, ale přidáme centrování */
+/* Zajištění načtení fontů Norwester a Kollektif (pokud jsou k dispozici, jinak fallback) */
+@font-face {
+    font-family: 'Norwester';
+    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/norwester/Norwester-Regular.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Kollektif Regular';
+    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/kollektif/Kollektif-Regular.ttf') format('truetype');
+}
+
+/* 2. Streamlit celkové nastavení */
 .stApp {
     padding-top: 20px;
-    background-color: #0e1117; /* Standardní tmavé Streamlit pozadí */
+    background-color: #131317; /* Washed Black pozadí */
     color: #FAFAFA;
 }
 
-/* 2. Stylování nadpisů (H1, H2, H3) - Oswald font */
-h1, h2, h3, h4 {
-    font-family: 'Oswald', sans-serif !important;
+/* 3. Stylování nadpisů (Font Oswald/Kollektif) */
+h1 {
+    font-family: 'Norwester', sans-serif !important; /* Hlavní nadpis - Norwester */
     text-align: center;
-    color: #FAFAFA; /* Světlá barva pro kontrast */
+    color: #FAFAFA;
+    text-transform: uppercase;
 }
-
-/* 3. Stylování textu a motta - Source Sans Pro font */
-body, p, div {
-    font-family: 'Source Sans Pro', sans-serif;
-}
-
-/* Centrování hlavních prvků (titulku a motta) */
-.st-emotion-cache-18j3dkg { /* Cílí na Streamlit nadřazený kontejner titulků */
+h2, h3, h4 {
+    font-family: 'Kollektif Regular', sans-serif !important; /* Ostatní nadpisy - Kollektif */
     text-align: center;
-    width: 100%;
-}
-.st-emotion-cache-1c9v511 { /* Cílí na nadpis H1 */
-    width: 100%;
+    color: #FAFAFA;
 }
 
-/* Zarovnání textu na střed pro motto a AI summary */
+/* 4. Stylování textu a motta (Font Montserrat Light) */
+p, div, .stMarkdown, label {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 300; /* Light */
+}
 .stMarkdown {
     text-align: center;
 }
 
-/* Zarovnání tabulek a grafů na střed (vyžaduje úpravu layoutu) */
-.stDataFrame, .stTable {
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* Oprava zarovnání pro st.subheader (standardní Streamlit zarovnání) */
+/* Centrování hlavních prvků (Streamlit workarounds) */
 section[data-testid="stSidebar"] + div h3 {
     text-align: center;
 }
 
+/* Stylování pro tabulky a infobox (aby sedělo k tmavému pozadí) */
+.stDataFrame, .stTable {
+    margin-left: auto;
+    margin-right: auto;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+}
+.stAlert {
+    background-color: #222233;
+    color: #FAFAFA;
+    border-color: #444466;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,13 +79,11 @@ st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
 # -------------------------
 # KONFIGURACE DAT
 # -------------------------
-# Cesta k vašemu manuálně spravovanému souboru s příponou .txt
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-LOOKBACK_DAYS = 90  # 3 měsíce pro filtrování zobrazení
+LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
 
-# KEYWORDS (pouze pro definici kategorií v tabulkách)
 CATEGORY_KEYWORDS = {
     "Inflace": [], "Úrokové sazby": [], "Trh práce": [], "Ekonomická aktivita": []
 }
@@ -115,13 +126,14 @@ def score_event(row):
     if a < f: return -1
     return 0
 
+# ZMĚNA LOGIKY: Bullish >+2, Neutral 1/0/-1, Bearish <-2
 def evaluate_category(df_cat):
     df_scored = df_cat[pd.to_numeric(df_cat['Points'], errors='coerce').notna()]
     total = int(df_scored["Points"].sum())
     
-    if total > 2: label = "Bullish"
-    elif total < -2: label = "Bearish"
-    else: label = "Neutral"
+    if total >= 2: label = "Bullish"
+    elif total <= -2: label = "Bearish"
+    else: label = "Neutral" # Pokrývá 1, 0, -1
     return total, label
 
 # AI shrnutí
@@ -176,6 +188,7 @@ if df_high.empty:
 df_high["Points"] = df_high.apply(score_event, axis=1)
 df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 
+# Filtrace: pouze události s Actual hodnotou (proběhlé)
 df_scored = df_high[pd.to_numeric(df_high['Actual'], errors='coerce').notna()].copy()
 df_all_display = df_high.copy()
 
@@ -200,7 +213,7 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Stylování (pro jednoduchost používáme applymap přímo v tabulce, ne v summary)
+    # Stylování bodů
     styled_df = display_df.style.applymap(color_points_basic, subset=['Points'])
     
     if i % 2 == 0:
@@ -217,12 +230,13 @@ st.markdown("---")
 # -------------------------
 # 4. VYHODNOCENÍ FUNDAMENTU A AI ANALÝZA (KONZOLIDACE)
 # -------------------------
-st.header("Vyhodnocení fundamentu") # Přejmenováno
+st.header("Vyhodnocení fundamentu") 
 
 summary_rows = []
 total_combined_score = 0
 
 for cat, df_cat in category_frames.items():
+    # Používáme novou logiku evaluate_category
     total, label = evaluate_category(df_cat)
     total_combined_score += total
     summary_rows.append({
@@ -235,17 +249,17 @@ for cat, df_cat in category_frames.items():
 summary_df = pd.DataFrame(summary_rows)
 final_score = total_combined_score
 
-if final_score > 2: final_label = "Bullish pro USD"
-elif final_score < -2: final_label = "Bearish pro USD"
+# Znovu aplikujeme novou logiku bodování na finální skóre
+if final_score >= 2: final_label = "Bullish pro USD"
+elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-st.subheader("Category summary") # Přejmenováno na Category summary
+st.subheader("Category summary") 
 
 # Zobrazení standardní, nestylované tabulky pro stabilitu
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # KONZOLIDACE: Celkové skóre + AI Vyhodnocení v jednom bloku
-# Používáme st.markdown pro zobrazení finálního výsledku s barvou
 st.markdown(f"### Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**")
 st.subheader("AI Fundamentální Vyhodnocení")
 st.info(generate_ai_summary(summary_df, final_score, final_label).replace('**', ''))
@@ -256,8 +270,9 @@ st.markdown("---")
 # -------------------------
 # 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ
 # -------------------------
-st.header("Graf fundamentálních kategorií") # Přejmenováno
+st.header("Graf fundamentálních kategorií") 
 
+# GRAF: Používá df_scored pro zobrazení pouze proběhlých událostí
 viz_df = df_scored.copy() 
 viz_df["DateSimple"] = viz_df["DateParsed"].dt.date
 viz_agg = viz_df.groupby(["DateSimple","Category"])["Points"].sum().reset_index()
@@ -265,6 +280,13 @@ viz_agg = viz_df.groupby(["DateSimple","Category"])["Points"].sum().reset_index(
 if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Body podle kategorie v čase (denní agregát z proběhlých událostí)")
+    
+    # Úprava grafu pro tmavé pozadí
+    fig.update_layout(
+        plot_bgcolor='#1a1a1a', 
+        paper_bgcolor='#1a1a1a', 
+        font_color='#FAFAFA'
+    )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Není dost dat pro graf.")
