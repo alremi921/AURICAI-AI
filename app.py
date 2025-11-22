@@ -133,25 +133,24 @@ div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
     border-collapse: collapse;
 }}
 
-/* ------------------- STYLING st.dataframe ------------------- */
+/* ------------------- STYLING st.dataframe - ZÁSADNÍ OPRAVA BAREV ------------------- */
 
-/* Všechny buňky (data, hlavičky, řádky) */
+/* Všechny datové buňky a hlavičky (primární cílení) */
 div[data-testid="stDataFrame"] div[role="gridcell"],
 div[data-testid="stDataFrame"] div[role="columnheader"]
 {{
     background-color: {BG_BLACK} !important;
     color: {TEXT_CREAM} !important; 
-    border: 2px solid {TEXT_CREAM} !important; /* Vynucení viditelných hran */
+    border: 1px solid {TEXT_CREAM} !important; /* Mírnější border pro lepší čitelnost */
     border-radius: 0 !important;
     box-shadow: none !important;
 }}
 
-/* Hlavičky sloupců */
-div[data-testid="stDataFrame"] .col-header-row div[role="columnheader"] {{
+/* Zajištění, že tabulkové kontejnery uvnitř st.dataframe mají tmavé pozadí */
+div[data-testid="stDataFrame"] .data-row,
+div[data-testid="stDataFrame"] .col-header-row {{
     background-color: {BG_BLACK} !important;
     color: {TEXT_CREAM} !important;
-    border: 2px solid {TEXT_CREAM} !important;
-    border-radius: 0 !important;
 }}
 
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
