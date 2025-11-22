@@ -94,10 +94,9 @@ div[data-testid="stAlert"] svg {{
 
 
 /* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
-/* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
+/* ZVĚTŠENÍ PŮVODNÍHO POLE A OPRAVA OŘEZÁNÍ HRAN */
 
 /* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ A STÍNŮ */
-/* Cílíme na VŠECHNY podřízené elementy uvnitř tabulkového kontejneru a potlačujeme border-radius a box-shadow */
 div[data-testid*="stTable"] *, 
 div[data-testid*="stDataFrame"] * {{
     border-radius: 0 !important;
@@ -105,7 +104,7 @@ div[data-testid*="stDataFrame"] * {{
     outline: none !important;
 }}
 
-/* Cílíme na hlavní Streamlit kontejnery pro zvětšení "původního pole" a odstranění vnějších borderů */
+/* 2. Cílení na hlavní Streamlit kontejnery pro ZVĚTŠENÍ "původního pole" a odstranění vnějších borderů */
 div[data-testid*="stTable"], 
 div[data-testid*="stDataFrame"] {{
     box-shadow: none !important; 
@@ -114,17 +113,20 @@ div[data-testid*="stDataFrame"] {{
     background-color: {BG_BLACK} !important;
     padding: 0 !important; /* Odstraní vnitřní odsazení kontejneru */
     margin: 0 !important;
+    overflow: visible !important; /* Povolí tabulce přesahovat vnější kontejner */
 }}
-/* Poslední záchranná brzda proti zaoblení na okrajích, které by mohlo být stínem */
+
+/* 3. Poslední záchranná brzda proti zaoblení na okrajích, které by mohlo být stínem */
 div[data-testid="stTable"] > div,
 div[data-testid="stDataFrame"] > div {{
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    overflow: visible !important;
 }}
 
 
-/* 2. Cílení na samotné buňky a tělo tabulky */
+/* 4. Cílení na samotné buňky a tělo tabulky */
 div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
     width: 100% !important; 
     table-layout: auto; 
@@ -213,7 +215,7 @@ st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
 # KONFIGURACE DAT
 # -------------------------
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NOVÁ KONSTANTA PRO SOUBOR
+DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NOVÁ CESTA K SOUBORU
 LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
@@ -259,11 +261,10 @@ def load_seasonality_data():
         return None
     try:
         # Očekáváme sloupec 'Month' (jako text Měsíc) a 'Return' (jako průměrná návratnost v %)
-        # Používáme CSV s oddělovačem čárka a desetinnou tečkou
         df = pd.read_csv(DXY_HISTORY_PATH, decimal='.', sep=',') 
         
         if 'Month' not in df.columns or 'Return' not in df.columns:
-            st.warning(f"Soubor '{DXY_HISTORY_PATH}' by měl obsahovat sloupce 'Month' (text) a 'Return' (číslo). Používám mock data.")
+            # Nevypisujeme varování, abychom udrželi čistý výstup, ale vracíme None
             return None
         
         # Převedeme názvy měsíců na index pro správné řazení v grafu
@@ -274,14 +275,12 @@ def load_seasonality_data():
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
-             st.warning(f"Některé názvy měsíců v souboru '{DXY_HISTORY_PATH}' nejsou platné. Používám mock data.")
              return None
              
         df = df.sort_values('Month_Index').reset_index(drop=True)
         return df
     except Exception as e:
-        # Logujeme chybu pro Streamlit (i po opravě CSV je dobré ji nechat)
-        st.error(f"Nepodařilo se načíst nebo zpracovat soubor sezónnosti CSV. Chyba: {e}")
+        # Tichá chyba, aby se zobrazil mock graf
         return None
 
 
@@ -332,12 +331,6 @@ def highlight_points_and_style_text(row):
     # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
     default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 2px solid {TEXT_CREAM}; border-radius: 0 !important;'
     styles = [default_style] * len(row)
-    
-    # Vynutíme stejný styl i pro sloupec Points
-    if 'Points' in row.index:
-        idx = row.index.get_loc('Points')
-        styles[idx] = default_style
-    
     return styles
 
 # --- POMOCNÁ FUNKCE PRO SEZONNOST (DXY MOCK DATA) ---
@@ -418,8 +411,8 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Aplikace OPRAVENÉHO STYLU (nyní bez barevného rozlišení bodů)
-    styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1)
+    # Aplikace OPRAVENÉHO STYLU a SKRYTÍ INDEXU
+    styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1).hide(axis="index")
 
     if i % 2 == 0:
         with cols[0]:
@@ -459,7 +452,8 @@ elif final_score <= -2: final_label = "BEARISH"
 else: final_label = "NEUTRAL"
 
 # Zobrazení souhrnné tabulky (Bez jakéhokoliv barevného rozlišení)
-styled_summary = summary_df.style.format({"Total Points":"{:+d}"})
+# SKRYTÍ INDEXU U SOUHRNNÉ TABULKY
+styled_summary = summary_df.style.format({"Total Points":"{:+d}"}).hide(axis="index")
 
 st.table(styled_summary) 
 
@@ -506,7 +500,8 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Meze
 # 5.5 GRAF SEZÓNNOSTI USD
 # -------------------------
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.header("Graf sezónnosti USD (Historický výkon)")
+# Změněný název
+st.header("Graf sezónosti U.S. dolar indexu")
 
 df_seasonality = load_seasonality_data()
 use_mock_data = False
@@ -515,35 +510,17 @@ if df_seasonality is None:
     df_seasonality = generate_dxy_seasonality_data()
     use_mock_data = True
 
-if use_mock_data:
-    st.markdown(f"""
-        <p style='text-align: center; font-size: 0.9em;'>
-            POZNÁMKA: Soubor **'{DXY_HISTORY_PATH}'** nebyl nalezen nebo má neplatný formát. 
-            Graf zobrazuje MOCK data sezónnosti pro USD Index ($DXY$). 
-            Pro zobrazení skutečných dat vložte CSV se sloupci 'Month' (Leden, Únor, atd.) a 'Return'.
-        </p>
-    """, unsafe_allow_html=True)
-    y_column = "Return"
-    title_suffix = "– Mock data"
-else:
-    st.markdown(f"""
-        <p style='text-align: center; font-size: 0.9em;'>
-            Graf zobrazuje průměrnou měsíční návratnost, vypočítanou ze souboru **'{DXY_HISTORY_PATH}'**.
-        </p>
-    """, unsafe_allow_html=True)
-    y_column = "Return"
-    title_suffix = ""
-
+y_column = "Return"
 
 # Změna na LINE CHART
 fig_season = px.line(df_seasonality, 
                     x="Month", 
                     y=y_column,
-                    title=f"Průměrná měsíční návratnost USD Indexu ($DXY$) {title_suffix}",
+                    title=f"Průměrná měsíční návratnost",
                     labels={y_column: "Průměrná návratnost (%)", "Month": "Měsíc"},
                     markers=True, line_shape='linear') # Použití line chartu
 
-# *** NOVÁ ÚPRAVA: Nastavení barvy čáry na světlou (TEXT_CREAM) ***
+# *** Úprava: Nastavení barvy čáry na světlou (TEXT_CREAM) ***
 fig_season.update_traces(line=dict(color=TEXT_CREAM), marker=dict(color=TEXT_CREAM))
 
 # Přidání nulové linie pro přehlednost
