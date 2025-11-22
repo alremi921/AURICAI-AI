@@ -92,25 +92,25 @@ div[data-testid="stAlert"] svg {{
 }}
 
 
-/* *** KRITICKÉ: FIX PRO TABULKY A NÁHLAVI *** */
-/* Standardní buňky v sekci CREAM by měly být BLACK text na CREAM pozadí, 
-   ale Streamlit Styler toto často přebíjí. Použijeme univerzální tmavou barvu
-   pro hlavičky st.table a st.dataframe v sekci CREAM. */
-.section-cream table th {{
-    color: {TEXT_BLACK} !important; 
-    background-color: {BG_CREAM} !important;
+/* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT) *** */
+/* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
+div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
+    width: 100% !important; /* ROZTAŽENÍ SUMMARY TABULKY */
+    table-layout: auto; 
+    border-collapse: collapse;
 }}
-/* Zajistíme, že i bez styleru budou data viditelná v Black Sekci */
-.section-black table td {{
-    color: {TEXT_CREAM} !important;
+div[data-testid="stTable"] table th, 
+div[data-testid="stTable"] table td,
+div[data-testid="stDataFrame"] table th,
+div[data-testid="stDataFrame"] table td
+{{
     background-color: {BG_BLACK} !important;
-}}
-.section-black table th {{
-    color: {TEXT_CREAM} !important;
-    background-color: {BG_BLACK} !important;
+    color: {TEXT_CREAM} !important; 
+    border: 1px solid {TEXT_CREAM};
 }}
 
-/* Centrování Celkového skóre s RÁMEČKEM */
+
+/* Centrování Celkového skóre s RÁMEČKEM (Oprava Centrování) */
 .score-line-container {{
     padding: 15px;
     border: 1px solid {TEXT_CREAM}; 
@@ -149,9 +149,11 @@ div[data-testid="stAlert"] svg {{
 }}
 
 /* ZAJIŠTĚNÍ CENTROVÁNÍ VŠECH PRVKŮ VE ST.TABLE A ST.DATAFRAME A SKÓRE */
+/* Vynucení centrování celého bloku, včetně skóre */
 div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     display: flex;
     justify-content: center;
+    width: 100%; /* Vynuceno pro celou sekci/kontejner */
 }}
 .center-div {{
     display: flex;
@@ -242,11 +244,12 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     
     return summary
 
-# --- NOVÁ FUNKCE PRO STYLOVÁNÍ DATAFRAMU (OPRAVA ČITELNOSTI) ---
+# --- FUNKCE PRO STYLOVÁNÍ DATAFRAMU (ČERNÉ POZADÍ, KRÉMOVÝ TEXT) ---
 # Tato funkce se aplikuje na řádek (axis=1) a kontroluje sloupec 'Points'
 def highlight_points_and_style_text(row):
-    # Výchozí styl pro VŠECHNY buňky: Krémové pozadí, ČERNÝ TEXT
-    default_style = f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};'
+    # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
+    # white-space: nowrap zabraňuje přeskakování písmen v dlouhých názvech.
+    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; white-space: nowrap;'
     styles = [default_style] * len(row)
     
     # Najdeme index sloupce 'Points'
@@ -257,11 +260,11 @@ def highlight_points_and_style_text(row):
         # Aplikujeme speciální barvy pro kladné/záporné body
         if pd.notna(val):
             if val > 0:
-                styles[idx] = 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
+                styles[idx] = 'background-color: #38761d; color: white; border: 1px solid #38761d; white-space: nowrap;' 
             elif val < 0:
-                styles[idx] = 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
+                styles[idx] = 'background-color: #cc0000; color: white; border: 1px solid #cc0000; white-space: nowrap;'
             else:
-                 # 0 bodů by mělo mít také ČERNÝ text na CREAM pozadí
+                 # 0 bodů - standardní styl
                  styles[idx] = default_style
     
     return styles
@@ -273,7 +276,8 @@ def color_summary_points_column(val):
         return 'background-color: #38761d; color: white; border: 1px solid #38761d;' 
     elif val_num < 0:
         return 'background-color: #cc0000; color: white; border: 1px solid #cc0000;'
-    return f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};'
+    # Výchozí styl: Černé pozadí, Krémový text
+    return f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM};'
 
 # -------------------------
 # BUILD DASHBOARD
@@ -310,6 +314,8 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Meze
 # -------------------------
 st.markdown("<div class='section-cream'>", unsafe_allow_html=True)
 st.header("Rozdělení fundamentálních zpráv do kategorií")
+
+# Zde jsou tabulky v Streamlit sloupcích (menší šířka)
 cols = st.columns(2)
 
 category_frames = {}
@@ -328,7 +334,7 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Aplikace OPRAVENÉHO STYLU pomocí df.style.apply(..., axis=1) pro plnou kontrolu nad barvou textu
+    # Aplikace OPRAVENÉHO STYLU pro čitelnost a zamezení zalamování
     styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1)
 
     if i % 2 == 0:
@@ -368,16 +374,16 @@ if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-# Zobrazení standardní tabulky (Vyhodnocení fundamentu - bude krémová, text černý)
-# Aplikujeme formát a styl pro Total Points, zbytek přes lambda funkci pro vynucení BLACK textu
+# Zobrazení souhrnné tabulky (Nyní celá šířka)
+# Aplikujeme formát a styl pro Total Points, zbytek pro BLACK/CREAM
 styled_summary = summary_df.style.format({"Total Points":"{:+d}"}) \
     .applymap(color_summary_points_column, subset=['Total Points']) \
-    .applymap(lambda v: f'background-color: {BG_CREAM}; color: {TEXT_BLACK}; border: 1px solid {TEXT_BLACK};', 
+    .applymap(lambda v: f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM};', 
               subset=['Category', 'Events Count', 'Evaluation'])
 
 st.table(styled_summary) 
 
-# Podtržení Celkového skóre (v Black sekci, text je CREAM)
+# Podtržení Celkového skóre (v Black sekci, text je CREAM, CENTROVÁNO)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
 st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
