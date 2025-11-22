@@ -95,7 +95,7 @@ div[data-testid="stAlert"] svg {{
 /* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
 /* Standardní tabulky Streamlit (st.table) - aplikujeme globální styl */
 div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
-    width: 100% !important; /* ROZTAŽENÍ SUMMARY TABULKY */
+    width: 100% !important; /* Vynucení šířky 100% pro Summary tabulku */
     table-layout: auto; 
     border-collapse: collapse;
 }}
@@ -116,12 +116,13 @@ div[data-testid="stTable"] table th {{
 }}
 
 
-/* Centrování Celkového skóre s RÁMEČKEM (Odstranění rámečku a Oprava Centrování) */
+/* Centrování Celkového skóre s RÁMEČKEM (Odstranění rámečku a Centrování) */
 .score-line-container {{
     /* Zrušení rámečku */
     border: none; 
     padding: 0;
-    display: block; /* Použijeme blok pro snadnější centrování uvnitř center-div */
+    /* Důležité pro centrování uvnitř flex-kontejneru center-div */
+    display: block; 
     margin: 20px auto 30px auto; 
     text-align: center;
 }}
@@ -156,13 +157,12 @@ div[data-testid="stTable"] table th {{
 }}
 
 /* ZAJIŠTĚNÍ CENTROVÁNÍ VŠECH PRVKŮ VE ST.TABLE A ST.DATAFRAME A SKÓRE */
-/* Vynucení centrování celého bloku, včetně skóre */
 div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     display: flex;
     justify-content: center;
-    width: 100%; /* Vynuceno pro celou sekci/kontejner */
+    width: 100%; 
 }}
-/* Vynucuje centrování score-line-container i po odstranění inline-block */
+/* Vynucuje centrování score-line-container */
 .center-div {{
     display: flex;
     justify-content: center;
@@ -258,10 +258,9 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     return summary
 
 # --- FUNKCE PRO STYLOVÁNÍ DATAFRAMU (ČERNÉ POZADÍ, KRÉMOVÝ TEXT) ---
-# Tato funkce se aplikuje na řádek (axis=1) a kontroluje sloupec 'Points'
+# Barví pouze sloupec Points podle pozitivního/negativního výsledku
 def highlight_points_and_style_text(row):
     # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
-    # white-space: nowrap je nyní v globálním CSS pro hlavičky. 
     default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; border-radius: 0 !important;'
     styles = [default_style] * len(row)
     
@@ -282,22 +281,7 @@ def highlight_points_and_style_text(row):
     
     return styles
 
-# NOVÁ: Funkce pro stylování CELÉHO řádku souhrnné tabulky
-def color_evaluation_row(row):
-    # Bullish: tmavě zelená (#38761d), Bearish: tmavě červená (#cc0000), Neutral: BG_BLACK
-    
-    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 1px solid {TEXT_CREAM}; border-radius: 0 !important;'
-    bullish_style = 'background-color: #38761d; color: white; border: 1px solid #38761d; border-radius: 0 !important;'
-    bearish_style = 'background-color: #cc0000; color: white; border: 1px solid #cc0000; border-radius: 0 !important;'
-    
-    if row['Evaluation'] == 'Bullish':
-        style = bullish_style
-    elif row['Evaluation'] == 'Bearish':
-        style = bearish_style
-    else: # Neutral
-        style = default_style
-        
-    return [style] * len(row)
+# Vypuštěna funkce color_evaluation_row, aby tabulka Vyhodnocení fundamentu nebyla barevná.
 
 
 # -------------------------
@@ -356,8 +340,6 @@ for i, cat in enumerate(unique_categories):
     )
     
     # Aplikace OPRAVENÉHO STYLU pro čitelnost a zamezení zalamování
-    # Všimněte si, že zde st.table volá st.dataframe, který má globálně nastavenou 100% šířku,
-    # ale je uvnitř Streamlit sloupce, což efektivně zmenší jeho prostor.
     styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1)
 
     if i % 2 == 0:
@@ -397,13 +379,13 @@ if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-# Zobrazení souhrnné tabulky (Nyní celá šířka a barvení řádků)
-styled_summary = summary_df.style.format({"Total Points":"{:+d}"}) \
-    .apply(color_evaluation_row, axis=1) # Aplikuje barvení celého řádku
+# Zobrazení souhrnné tabulky (Bez barevného rozlišení řádků)
+# Tabulka by měla být široká 200% díky globálnímu CSS
+styled_summary = summary_df.style.format({"Total Points":"{:+d}"})
 
 st.table(styled_summary) 
 
-# Podtržení Celkového skóre (v Black sekci, text je CREAM, CENTROVÁNO a bez rámečku)
+# Podtržení Celkového skóre (bez rámečku, CENTROVÁNO)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
 st.markdown(f"<div class='score-line-container'><span class='score-line'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
