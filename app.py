@@ -54,7 +54,7 @@ h1 {{
 h2, h3, h4, .small-title {{
     font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
-    font-weight: 300; 
+    font-weight: 300; /* ZAJIŠTĚNÍ LIGHT VÁHY PRO VŠECHNY NADPISY */
     text-transform: uppercase;
     margin-bottom: 20px; 
 }}
@@ -99,7 +99,7 @@ p, div, label {{
 .stDataFrame table thead th, .stDataFrame table tbody td, 
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important; /* KRITICKÁ OPRAVA: Černý text v krémových buňkách */
+    color: {TEXT_BLACK} !important; /* KRITICKÁ OPRAVA: Text v tabulkách je černý */
     border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
 }}
@@ -161,6 +161,12 @@ div[data-testid="stAlert"] svg {{
 /* Přidání mezer mezi sekce (čisté enter) */
 .section-spacer {{
     height: 30px; 
+}}
+
+/* ZAJIŠTĚNÍ CENTROVÁNÍ VŠECH PRVKŮ VE ST.TABLE A ST.DATAFRAME */
+div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
+    display: flex;
+    justify-content: center;
 }}
 
 </style>
