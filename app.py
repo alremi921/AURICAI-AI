@@ -366,7 +366,7 @@ st.markdown("<p class='small-title'>USD MACRO AI DASHBOARD</p>", unsafe_allow_ht
 # Hlavní nadpis (Montserrat Light, Uppercase)
 st.title("AURICAI AI")
 # Motto (Libre Baskerville)
-st.markdown("<p class='motto'>"BEAT THE ODDS"</p>", unsafe_allow_html=True) 
+st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
 # Načítání dat
