@@ -9,9 +9,9 @@ import os
 # DEFINICE BAREV A CEST
 # -------------------------
 BG_BLACK = '#0E1117' # Tmavé Streamlit pozadí
-BG_CREAM = '#F2EEDB' # Krémová (ponechána pro sekci CREAM)
-TEXT_CREAM = '#FAFAFA' # Čistě bílý text (TEXT_WHITE)
-TEXT_BLACK = '#0C0C0C' # Původní Washed Black
+BG_CREAM = '#FFFFFF' # Čistě bílé pozadí (pro sekci CREAM)
+TEXT_CREAM = '#FFFFFF' # Čistě bílý text
+TEXT_BLACK = '#0E1117' # Tmavá barva textu (pro sekci CREAM)
 
 # Nová barva pro okraje a linky grafů, dle požadavku
 BORDER_DARK = '#31333F' 
