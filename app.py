@@ -90,32 +90,66 @@ def fetch_usd_macro_events():
 # ======================================================
 # DISPLAY FUNDAMENT SECTION
 # ======================================================
+# ======================================================
+# ============= MODULE A: FUNDAMENTS (NO ICALENDAR) =====
+# ======================================================
 
-st.header("📰 USD Makro Fundamenty — High Impact (Realtime)")
+def fetch_usd_macro_events():
+    """
+    Fully functional Investing.com macro feed (no icalendar required).
+    Source: FairEconomy JSON mirror (always available).
+    """
+    url = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json"
 
-fund = fetch_usd_macro_events()
+    try:
+        data = requests.get(url, timeout=10).json()
+    except:
+        return pd.DataFrame()
 
-if fund.empty:
-    st.warning("⚠️ Nepodařilo se načíst makro data.")
-else:
-    fund["Date"] = pd.to_datetime(fund["Date"])
-    fund = fund.sort_values("Date", ascending=False)
+    rows = []
 
-    fund["Signal Label"] = fund["Signal"].map({
-        1: "🔺 +1 Bullish",
-        0: "⏺ 0 Neutral",
-        -1: "🔻 -1 Bearish"
-    })
+    for ev in data.get("data", []):
+        # Filter only USD events + High Impact
+        if ev.get("country") != "United States":
+            continue
+        if ev.get("impact", 0) < 3:
+            continue
 
-    st.dataframe(
-        fund[["Date", "Report", "Actual", "Forecast", "Previous", "Signal Label"]],
-        use_container_width=True
-    )
+        ts = ev.get("timestamp")
+        if ts:
+            dt = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+        else:
+            dt = None
 
-    total_score = fund["Signal"].sum()
-    st.subheader(f"📊 Celkové fundamentální skóre: **{total_score}**")
+        actual = ev.get("actual")
+        forecast = ev.get("forecast")
 
-st.markdown("---")
+        def clean(x):
+            if x in [None, "", "-"]: return None
+            try:
+                return float(str(x).replace("%", "").replace(",", ""))
+            except:
+                return None
+
+        a = clean(actual)
+        f = clean(forecast)
+
+        signal = 0
+        if a is not None and f is not None:
+            signal = 1 if a > f else -1 if a < f else 0
+
+        rows.append({
+            "Date": dt,
+            "Report": ev.get("event"),
+            "Actual": actual,
+            "Forecast": forecast,
+            "Previous": ev.get("previous"),
+            "Signal": signal
+        })
+
+    df = pd.DataFrame(rows)
+    return df
+
 
 
 
