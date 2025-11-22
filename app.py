@@ -8,10 +8,13 @@ import os
 # -------------------------
 # DEFINICE BAREV A CEST
 # -------------------------
-BG_BLACK = '#0C0C0C' # Washed Black
-BG_CREAM = '#F2EEDB' # Krémová
-TEXT_CREAM = '#F2EEDB'
-TEXT_BLACK = '#0C0C0C'
+BG_BLACK = '#0E1117' # Tmavé Streamlit pozadí
+BG_CREAM = '#F2EEDB' # Krémová (ponechána pro sekci CREAM)
+TEXT_CREAM = '#FAFAFA' # Čistě bílý text (TEXT_WHITE)
+TEXT_BLACK = '#0C0C0C' # Původní Washed Black
+
+# Nová barva pro okraje a linky grafů, dle požadavku
+BORDER_DARK = '#31333F' 
 
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
 DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NOVÁ CESTA K SOUBORU
@@ -35,7 +38,7 @@ st.markdown(f"""
 .stApp {{
     padding-top: 20px;
     background-color: {BG_BLACK}; 
-    color: {TEXT_CREAM};
+    color: {TEXT_CREAM}; /* Čistě bílý text */
 }}
 
 /* 3. Stylování nadpisů (Montserrat Light, Uppercase) */
@@ -105,8 +108,8 @@ div[data-testid="stTable"] {{
 .dark-table table thead th, 
 .dark-table table tbody td {{
     background-color: {BG_BLACK} !important; 
-    color: {TEXT_CREAM} !important; /* KRITICKÉ: KRÉMOVÝ TEXT NA ČERNÉM POZADÍ */
-    border: 1px solid {TEXT_CREAM} !important; 
+    color: {TEXT_CREAM} !important; /* Čistě bílý text na tmavém pozadí */
+    border: 1px solid {BORDER_DARK} !important; /* Tmavý okraj tabulek */
     border-radius: 0px !important;
     box-shadow: none !important;
 }}
@@ -328,7 +331,7 @@ dark_styler = [
     {'selector': 'th, td',
      'props': [('background-color', BG_BLACK), 
                ('color', TEXT_CREAM),
-               ('border', f'1px solid {TEXT_CREAM}'),
+               ('border', f'1px solid {BORDER_DARK}'), # Použití nové tmavé linky
                ('border-radius', '0')]},
     {'selector': 'table',
      'props': [('border-collapse', 'collapse')]}
@@ -472,7 +475,10 @@ if not viz_agg.empty:
         plot_bgcolor=f"{BG_BLACK}", 
         paper_bgcolor=f"{BG_BLACK}",
         font_color=f"{TEXT_CREAM}",
-        title_font_color=f"{TEXT_CREAM}"
+        title_font_color=f"{TEXT_CREAM}",
+        # Tmavší barva linek a os
+        xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+        yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK)
     )
     st.plotly_chart(fig, use_container_width=True)
 else:
@@ -508,13 +514,16 @@ fig_season = px.line(df_seasonality,
 fig_season.update_traces(line=dict(color=TEXT_CREAM), marker=dict(color=TEXT_CREAM))
 
 # Přidání nulové linie pro přehlednost
-fig_season.add_hline(y=0, line_dash="dash", line_color=TEXT_CREAM)
+fig_season.add_hline(y=0, line_dash="dash", line_color=BORDER_DARK) # Používá tmavší linku
 
 fig_season.update_layout(
     plot_bgcolor=f"{BG_BLACK}", 
     paper_bgcolor=f"{BG_BLACK}",
     font_color=f"{TEXT_CREAM}",
-    title_font_color=f"{TEXT_CREAM}"
+    title_font_color=f"{TEXT_CREAM}",
+    # Tmavší barva linek a os
+    xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+    yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK)
 )
 st.plotly_chart(fig_season, use_container_width=True)
 
