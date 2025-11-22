@@ -28,100 +28,96 @@ CATEGORY_KEYWORDS = {
 # -------------------------
 st.markdown(f"""
 <style>
-/* 1. Import Google Fonts (Fallback a Montserrat) */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400&display=swap');
-
-/* Definice custom fontů (Zajištění stability: používáme Montserrat fallback) */
-@font-face {{
-    font-family: 'The Seasons';
-    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Regular.ttf') format('truetype');
-    font-weight: 400;
-}}
-@font-face {{
-    font-family: 'Beautifully Delicious Light';
-    src: url('https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat-Light.ttf') format('truetype');
-    font-weight: 300;
-}}
+/* 1. Import Google Fonts (Pro spolehlivé náhrady) */
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Montserrat:wght@300;400;700&display=swap');
 
 /* 2. Streamlit celkové nastavení */
 .stApp {{
     padding-top: 20px;
-    background-color: {BG_BLACK}; /* Washed Black pozadí */
+    background-color: {BG_BLACK}; 
     color: {TEXT_CREAM};
 }}
 
 /* 3. Stylování nadpisů */
+/* HLAVNÍ NADPIS: Auricai AI */
 h1 {{
-    font-family: 'The Seasons', 'Montserrat', sans-serif !important; 
+    font-family: 'Libre Baskerville', serif !important; /* Náhrada za BASKERVILLE DISPLAY PT */
     text-align: center;
     color: {TEXT_CREAM};
-    font-weight: 400;
-    letter-spacing: 2px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-size: 2.5em;
 }}
-h2, h3, h4 {{
-    font-family: 'Beautifully Delicious Light', 'Montserrat', sans-serif !important; 
+/* MALÝ HORNÍ NADPIS A OSTATNÍ NADPISY */
+h2, h3, h4, .small-title {{
+    font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
     font-weight: 300; 
-    margin-bottom: 20px; /* Větší mezera pod nadpisy */
+    text-transform: uppercase;
+    margin-bottom: 20px; 
+}}
+.small-title {{
+    font-size: 0.9em;
+    color: {TEXT_CREAM};
+    margin-bottom: 10px;
 }}
 
 /* 4. Stylování textu a motta */
 p, div, label {{
     font-family: 'Montserrat', sans-serif !important;
     font-weight: 300; 
+    color: {TEXT_CREAM}; /* Default text color */
 }}
-.stMarkdown {{
-    text-align: center;
-    font-family: 'Montserrat', sans-serif !important;
-    font-weight: 300;
-}}
-/* Motto - Montserrat Light, Velká písmena */
+/* Motto - Libre Baskerville, Uppercase */
 .motto {{
-    font-family: 'Montserrat', sans-serif !important;
-    font-weight: 300; 
+    font-family: 'Libre Baskerville', serif !important;
+    font-weight: 400; 
     text-transform: uppercase;
     letter-spacing: 3px;
     margin-top: -10px;
     font-size: 1.1em;
 }}
 
-/* ZMĚNA: Stylování Tabulek */
+/* Nastavení barvy textu v krémových sekcích */
+.section-cream p, .section-cream div, .section-cream label {{
+    color: {TEXT_BLACK}; 
+}}
+
+/* ZMĚNA: Stylování Tabulek - OSTRÉ HRANY A KRÉMOVÉ POZADÍ */
 .stDataFrame, .stTable {{
     margin-left: auto;
     margin-right: auto;
-    border-radius: 0px !important; /* Ostré rohy */
+    border-radius: 0px !important; 
     border: none !important;
     background-color: transparent !important;
 }}
 
-/* Cílení na BUŇKY a HLAVIČKY - Dělá tabulky krémové a ostré */
+/* Cílení na BUŇKY a HLAVIČKY */
 .stDataFrame table thead th, .stDataFrame table tbody td, 
 .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
     color: {TEXT_BLACK} !important;
-    border: 1px solid {TEXT_BLACK}; /* Čisté ostré rozdělení */
+    border: 1px solid {TEXT_BLACK}; 
     border-radius: 0px !important;
-}}
-/* Nastavení pozadí celkové tabulky */
-.stTable table {{
-    background-color: {BG_CREAM} !important;
 }}
 
 /* *** KRITICKÁ OPRAVA: AI BOX (st.info) - ZRUŠIT MODROU VÝPLŇ *** */
-/* Cílení na vnitřní prvek (background-color) a kontejner (border) */
 div[data-testid="stAlert"] {{
-    background-color: {BG_BLACK} !important; /* Pozadí stejné jako sekce */
-    border: 1px solid #4A4A99 !important; /* Jemný modrý obrys */
-    color: {TEXT_CREAM} !important; /* Krémový text */
+    background-color: {BG_BLACK} !important; 
+    border: 1px solid {TEXT_CREAM} !important; /* Nová krémová barva obrysu */
+    color: {TEXT_CREAM} !important; 
     padding: 20px;
     margin-top: 10px;
 }}
-/* Cílení na Streamlit info box, kde je primární modrá barva */
+/* Potlačení modré barvy ikon a pozadí */
 div[data-testid="stAlert"] div[role="alert"] {{
-    background-color: {BG_BLACK} !important; /* Zajišťujeme, že modrá primární barva je přepsána */
+    background-color: {BG_BLACK} !important; 
 }}
 div[data-testid="stAlert"] svg {{
-    fill: {TEXT_CREAM} !important; /* Barva ikony */
+    fill: {TEXT_CREAM} !important; 
 }}
 
 
@@ -137,7 +133,7 @@ div[data-testid="stAlert"] svg {{
     margin-top: 20px; 
 }}
 
-/* --- BAREVNÉ SEKCE --- */
+/* --- BAREVNÉ SEKCE (Střídavé Pozadí) --- */
 .section-black {{
     background-color: {BG_BLACK};
     color: {TEXT_CREAM};
@@ -220,9 +216,30 @@ def evaluate_category(df_cat):
     else: label = "Neutral"
     return total, label
 
-# ZJEDNODUŠENÉ AI shrnutí (Původní verze bez detailního rozboru)
+# ZMĚNA: PRODLOUŽENÉ AI shrnutí (4-8 vět)
 def generate_ai_summary(summary_df, final_score, overall_label):
-    summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce dosáhlo hodnoty {final_score:+d}, což signalizuje {overall_label} sentiment. Analýza kategorií ukazuje, že hlavní vliv mají sektory s nejvyšším bodovým ziskem, zatímco negativní tlaky pocházejí ze slabších reportů."
+    
+    # 1. Celkový stav
+    summary = f"Celkové fundamentální skóre pro USD za poslední 3 měsíce dosáhlo hodnoty {final_score:+d}, což signalizuje **{overall_label}** sentiment pro americký dolar. Toto hodnocení je výsledkem vyváženého souboru High-Impact zpráv napříč čtyřmi klíčovými makroekonomickými kategoriemi. "
+    
+    # 2. Silné a slabé stránky
+    strongest = summary_df.sort_values('Total Points', ascending=False).iloc[0]
+    weakest = summary_df.sort_values('Total Points', ascending=True).iloc[0]
+    
+    if strongest['Total Points'] > 0:
+        summary += f"Nejsilnější podporu dolaru poskytla kategorie **{strongest['Category']}** s kumulativním skóre {strongest['Total Points']:+d}. To naznačuje, že zprávy jako {strongest['Category']} pravidelně překonávají očekávání trhu, což je klíčové pro silnou měnu. "
+    
+    if weakest['Total Points'] < 0:
+        summary += f"Naopak, nejslabším článkem se ukázala být kategorie **{weakest['Category']}** se skóre {weakest['Total Points']:+d}. Výsledky v této oblasti naznačují, že aktuální data zaostávají za konsenzem, což působí jako brzda. "
+    
+    # 3. Závěr
+    if overall_label == "Bullish":
+        summary += "I přes jisté slabiny převažuje optimismus. Silné makrodata by mohla nadále podporovat jestřábí postoj Federálního rezervního systému (FED). "
+    elif overall_label == "Bearish":
+        summary += "Trvalé negativní skóre ve více kategoriích vytváří medvědí výhled. Investoři by měli sledovat, zda se trend slabosti v nejvíce zasažených sektorech nezhorší. "
+    else:
+        summary += "Neutrální skóre naznačuje, že pozitivní a negativní fundamenty se efektivně vyrovnávají, a trh aktuálně postrádá jasný směr z makrodat. "
+        
     return summary
 
 # Funkce pro stylování Pandas DataFrame
@@ -243,7 +260,10 @@ def color_points_basic(val):
 
 # 1. HLAVNÍ TITULEK A MOTTO (Sekce #0C0C0C)
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.title("USD Macro AI Dashboard")
+# Malý horní nadpis
+st.markdown("<p class='small-title'>USD MACRO AI DASHBOARD</p>", unsafe_allow_html=True) 
+# Hlavní nadpis
+st.title("AURICAI AI")
 st.markdown("<p class='motto'>BEAT THE ODDS</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
@@ -280,28 +300,19 @@ for i, cat in enumerate(unique_categories):
     category_frames[cat] = cat_df_scored
 
     cat_df_display = cat_df_display.sort_values("DateParsed", ascending=False)
-    # Změna: Odebereme sloupec 'Points' z dat, aby ho mohlo stylovat Pandas
     display_df = cat_df_display[["DateDisplay", "Report", "Actual", "Forecast", "Previous", "Points"]].rename(
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
     # Stylování bodů: Použijeme st.table pro jednotný design
-    # Stylování buňek se aplikuje na celý DataFrame
-    # Je to nutné pro to, aby se design přenesl do st.table
-    styled_df = display_df.style.applymap(color_points_basic, subset=['Points'])
-    
-    # Převod na HTML, abychom mohli použít st.table pro jednotný design
-    # Vzhledem k tomu, že st.table má lepší stylování, použijeme ho
-    display_df_for_table = display_df.copy()
-    
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            st.table(display_df_for_table.style.applymap(color_points_basic, subset=['Points']))
+            st.table(display_df.style.applymap(color_points_basic, subset=['Points']))
     else:
         with cols[1]:
             st.subheader(cat)
-            st.table(display_df_for_table.style.applymap(color_points_basic, subset=['Points']))
+            st.table(display_df.style.applymap(color_points_basic, subset=['Points']))
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
 
 # -------------------------
@@ -334,7 +345,7 @@ else: final_label = "Neutral pro USD"
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
-st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</div>", unsafe_allow_html=True)
 
 # AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
 st.subheader("AI Fundamentální Vyhodnocení")
