@@ -7,19 +7,57 @@ import plotly.express as px
 import os 
 
 # -------------------------
-# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU A FONT (Standardní Streamlit design)
+# ZÁKLADNÍ CSS PRO CENTROVÁNÍ OBSAHU, FONT A TMVÉ TÉMA
 # -------------------------
 st.markdown("""
 <style>
+/* 1. Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Source+Sans+Pro:wght@400;700&display=swap');
+
 /* Streamlit standardní tmavé téma je zachováno, ale přidáme centrování */
 .stApp {
     padding-top: 20px;
+    background-color: #0e1117; /* Standardní tmavé Streamlit pozadí */
+    color: #FAFAFA;
 }
-/* Zarovnání prvků do středu (vyžaduje úpravu kontejneru) */
-.css-1d391kg {
-    justify-content: center;
+
+/* 2. Stylování nadpisů (H1, H2, H3) - Oswald font */
+h1, h2, h3, h4 {
+    font-family: 'Oswald', sans-serif !important;
+    text-align: center;
+    color: #FAFAFA; /* Světlá barva pro kontrast */
+}
+
+/* 3. Stylování textu a motta - Source Sans Pro font */
+body, p, div {
+    font-family: 'Source Sans Pro', sans-serif;
+}
+
+/* Centrování hlavních prvků (titulku a motta) */
+.st-emotion-cache-18j3dkg { /* Cílí na Streamlit nadřazený kontejner titulků */
+    text-align: center;
+    width: 100%;
+}
+.st-emotion-cache-1c9v511 { /* Cílí na nadpis H1 */
+    width: 100%;
+}
+
+/* Zarovnání textu na střed pro motto a AI summary */
+.stMarkdown {
     text-align: center;
 }
+
+/* Zarovnání tabulek a grafů na střed (vyžaduje úpravu layoutu) */
+.stDataFrame, .stTable {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Oprava zarovnání pro st.subheader (standardní Streamlit zarovnání) */
+section[data-testid="stSidebar"] + div h3 {
+    text-align: center;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -113,7 +151,6 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 def color_points_basic(val):
     val = pd.to_numeric(val, errors='coerce')
     if val > 0:
-        # Používá se standardní CSS pro pozadí (čistě funkční barvy)
         return 'background-color: #38761d; color: white' 
     elif val < 0:
         return 'background-color: #cc0000; color: white'
