@@ -4,22 +4,22 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import plotly.express as px
-import os # Pro kontrolu existence CSV souboru
+import os 
 
 st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
-st.title("💵 USD Macro AI Dashboard — Category Scoring (last 6 months, data z CSV)")
+st.title("💵 USD Macro AI Dashboard — Category Scoring (last 30 days, data z CSV)")
 
 # -------------------------
 # CONFIG
 # -------------------------
 # how far back (days)
-LOOKBACK_DAYS = 180  # ~6 months
+LOOKBACK_DAYS = 30
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
 
-CSV_FILE_PATH = "usd_macro_history.csv" # NOVÁ CESTA K DATŮM
+CSV_FILE_PATH = "usd_macro_history.csv.txt" # ZMĚNA: Nová cesta k datům
 
-# KEYWORDS for categories (case-insensitive) - Ponecháme pro budoucí použití, ale nyní je Category brána z CSV
+# KEYWORDS for categories (case-insensitive)
 CATEGORY_KEYWORDS = {
     "Inflace": [
         "cpi", "core cpi", "pce", "core pce", "consumer price", "inflation"
@@ -58,21 +58,20 @@ def clean_num(x):
 # NOVÁ FUNKCE: Načtení dat z lokálního CSV
 def load_events_from_csv():
     if not os.path.exists(CSV_FILE_PATH):
-        st.error(f"Chyba: Soubor s daty '{CSV_FILE_PATH}' nebyl nalezen. Vytvořte jej prosím.")
+        st.error(f"Chyba: Soubor s daty '{CSV_FILE_PATH}' nebyl nalezen. Ujistěte se, že je uložen ve stejném adresáři jako 'app.py'.")
         return pd.DataFrame()
 
     try:
-        # Načtení CSV
+        # POUŽÍVÁME read_csv I PRO SOUBOR S PŘÍPONOU .txt, PROTOŽE SE JEDNÁ O CSV FORMÁT
         df = pd.read_csv(CSV_FILE_PATH)
         
-        # Přejmenování klíčových sloupců na standardizované názvy (pro kompatibilitu s původní logikou)
         if 'Date' in df.columns:
              df["DateParsed"] = pd.to_datetime(df["Date"], errors="coerce")
         else:
              st.error("Chyba ve sloupcích CSV: Chybí sloupec 'Date'.")
              return pd.DataFrame()
 
-        # Filtrace podle časového okna (posledních 6 měsíců)
+        # Filtrace podle časového okna (posledních 30 dní)
         df = df[df["DateParsed"].notna()]
         df = df[df["DateParsed"] >= pd.Timestamp(START_DATE)]
         
@@ -81,10 +80,8 @@ def load_events_from_csv():
             df["ImpactNum"] = pd.to_numeric(df["Impact"], errors="coerce").fillna(0).astype(int)
             df = df[df["ImpactNum"] >= 3].copy()
         else:
-            # Pokud chybí, předpokládáme, že jsou všechna data v CSV high impact (Impact=3)
             df["ImpactNum"] = 3
 
-        # Finalizace sloupců
         df = df.sort_values("DateParsed", ascending=False)
         return df.reset_index(drop=True)
     
@@ -92,15 +89,12 @@ def load_events_from_csv():
         st.error(f"Nepodařilo se načíst nebo zpracovat soubor CSV. Zkontrolujte formátování. Chyba: {e}")
         return pd.DataFrame()
 
-
 # Score each event: compare actual vs forecast -> +1 / -1 / 0
 def score_event(row):
     a = clean_num(row.get("Actual"))
     f = clean_num(row.get("Forecast"))
     
-    # Skóre funguje, protože data pochází z CSV a Actual/Forecast jsou zaručeny.
     if a is None or f is None:
-        # Mělo by nastat pouze při chybě v zadávání CSV
         return 0
     if a > f:
         return 1
@@ -110,9 +104,7 @@ def score_event(row):
 
 # AI-style evaluator (simple rule-based aggregator requested)
 def evaluate_category(df_cat):
-    # sum points
     total = int(df_cat["Points"].sum())
-    # return classification per user's rule:
     if total > 2:
         label = "Bullish"
     elif total < -2:
@@ -123,9 +115,8 @@ def evaluate_category(df_cat):
 
 # NOVÁ FUNKCE: AI-style vyhodnocení
 def generate_ai_summary(summary_df, final_score, overall_label):
-    summary = f"Celkové fundamentální skóre pro USD za posledních 6 měsíců (data z CSV) je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
+    summary = f"Celkové fundamentální skóre pro USD za poslední měsíc (data z CSV) je **{final_score:+d}**, což vyúsťuje v **{overall_label}** sentiment. "
     
-    # Seřazení kategorií podle skóre
     sorted_summary = summary_df.sort_values("Total Points", ascending=False)
     
     best_cat = sorted_summary.iloc[0]
@@ -151,24 +142,19 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 # -------------------------
 st.header("Data fetch & processing")
 with st.spinner(f"Načítám data z lokálního souboru '{CSV_FILE_PATH}' (posledních ~{LOOKBACK_DAYS} dní)..."):
-    df_high = load_events_from_csv() # ZMĚNA: Voláme CSV funkci
+    df_high = load_events_from_csv()
 
 if df_high.empty:
-    st.error("Nepodařilo se načíst žádná platná data. Zkontrolujte soubor 'usd_macro_history.csv' a jeho formát.")
+    st.error("Nepodařilo se načíst žádná platná data. Zkontrolujte soubor 'usd_macro_history.csv.txt' a jeho formát (musí obsahovat hlavičku a čárky jako oddělovače).")
     st.stop()
 
-# Zajištění, že 'Category' je k dispozici
 if "Category" not in df_high.columns:
     st.error("Chyba: V souboru CSV chybí sloupec 'Category'. Bodování nelze provést.")
     st.stop()
 
-# Compute Points (Zde dojde ke správnému bodování, protože Actual/Forecast jsou v CSV)
 df_high["Points"] = df_high.apply(score_event, axis=1)
-
-# Standardize date string for display
 df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 
-# Show counts
 st.success(f"Nalezeno {len(df_high)} High-Impact událostí v cílových kategoriích za posledních {LOOKBACK_DAYS} dní. Data pochází ze souboru CSV.")
 
 # -------------------------
@@ -178,11 +164,10 @@ st.header("Tabulky podle témat")
 cols = st.columns(2)
 
 category_frames = {}
-for cat in CATEGORY_KEYWORDS.keys(): # Iterujeme přes definované kategorie
+for cat in CATEGORY_KEYWORDS.keys(): 
     cat_df = df_high[df_high["Category"] == cat].copy()
     
     if cat_df.empty:
-        # Přeskočit, pokud v dané kategorii nejsou žádná data
         continue 
     
     cat_df = cat_df.sort_values("DateParsed", ascending=False)
@@ -266,7 +251,7 @@ st.markdown("Stáhni data pro další analýzu:")
 csv_all = df_high.sort_values("DateParsed", ascending=False)[
     ["DateDisplay","Category","Report","Actual","Forecast","Previous","Points"]
 ].rename(columns={"DateDisplay":"Date"})
-st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_6mo_final.csv", "text/csv")
+st.download_button("Download events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_30d_final.csv", "text/csv")
 
 st.download_button("Download summary CSV", summary_df.to_csv(index=False).encode("utf-8"), "usd_macro_summary_final.csv", "text/csv")
 
