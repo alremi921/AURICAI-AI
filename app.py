@@ -94,7 +94,6 @@ div[data-testid="stAlert"] svg {{
 
 
 /* *** KRITICKÉ: FIX PRO TABULKY (ČERNÉ POZADÍ / KRÉMOVÝ TEXT / OSTRÉ HRANY) *** */
-/* ZVĚTŠENÍ PŮVODNÍHO POLE A OPRAVA OŘEZÁNÍ HRAN */
 
 /* 1. EXTRÉMNÍ AGRESIVNÍ CÍLENÍ NA VŠECHNY ZNÁMÉ OBALY PRO ODSTRANĚNÍ ZAOUBLENÍ A STÍNŮ */
 div[data-testid*="stTable"] *, 
@@ -127,6 +126,7 @@ div[data-testid="stDataFrame"] > div {{
 
 
 /* 4. Cílení na samotné buňky a tělo tabulky */
+/* POZNÁMKA: st.dataframe používá primárně interní styly, ale toto pomáhá */
 div[data-testid="stTable"] table, div[data-testid="stDataFrame"] table {{
     width: 100% !important; 
     table-layout: auto; 
@@ -152,6 +152,19 @@ div[data-testid="stTable"] table th {{
 /* Zabrání zalamování textu v hlavičkách tabulek v kategoriích (oprava "Actua" a "l") */
 div[data-testid="stTable"] table th {{
     white-space: nowrap !important;
+}}
+
+/* Nastavení stylů pro st.dataframe (aby vypadalo jako naše černo-krémová tabulka) */
+div[data-testid="stDataFrame"] .row-header {{
+    background-color: {BG_BLACK} !important;
+    color: {TEXT_CREAM} !important;
+    border-radius: 0 !important;
+}}
+div[data-testid="stDataFrame"] .col-header {{
+    background-color: {BG_BLACK} !important;
+    color: {TEXT_CREAM} !important;
+    border-radius: 0 !important;
+    border: 2px solid {TEXT_CREAM} !important;
 }}
 
 
@@ -327,11 +340,11 @@ def generate_ai_summary(summary_df, final_score, overall_label):
 
 # --- FUNKCE PRO STYLOVÁNÍ DATAFRAMU (BEZ BAREVNÉHO ROZLIŠENÍ) ---
 # Nyní zajišťuje pouze ostré hrany a vynucuje BG_BLACK/TEXT_CREAM na každé buňce.
-def highlight_points_and_style_text(row):
-    # Nový výchozí styl pro VŠECHNY buňky: Černé pozadí, Krémový text. 
-    default_style = f'background-color: {BG_BLACK}; color: {TEXT_CREAM}; border: 2px solid {TEXT_CREAM}; border-radius: 0 !important;'
-    styles = [default_style] * len(row)
-    return styles
+def highlight_points_and_style_text(val):
+    # Pro st.dataframe se stylování buňky řeší jinak nebo se používá globální CSS.
+    # Tato funkce není pro st.dataframe nutná, ponecháme ji pro konzistenci
+    # ale vrátíme prázdný řetězec, protože se na st.dataframe nepoužije.
+    return ""
 
 # --- POMOCNÁ FUNKCE PRO SEZONNOST (DXY MOCK DATA) ---
 def generate_dxy_seasonality_data():
@@ -398,6 +411,20 @@ cols = st.columns(2)
 category_frames = {}
 unique_categories = df_all_display["Category"].unique() 
 
+# Konfigurace sloupců pro st.dataframe pro správné formátování a zarovnání
+column_config = {
+    "Points": st.column_config.NumberColumn(
+        "Points",
+        format="%+d",
+        help="Skóre: +1 lepší než F, -1 horší než F, 0 shoda"
+    ),
+    "DateDisplay": "Date",
+    "Actual": st.column_config.TextColumn("Actual"),
+    "Forecast": st.column_config.TextColumn("Forecast"),
+    "Previous": st.column_config.TextColumn("Previous"),
+}
+
+
 for i, cat in enumerate(unique_categories):
     cat_df_display = df_all_display[df_all_display["Category"] == cat].copy()
     if cat_df_display.empty: continue 
@@ -411,17 +438,16 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Aplikace OPRAVENÉHO STYLU a SKRYTÍ INDEXU
-    styled_df = display_df.style.apply(highlight_points_and_style_text, axis=1).hide(axis="index")
-
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            st.table(styled_df)
+            # *** KLÍČOVÁ ZMĚNA: Použití st.dataframe s hide_index=True ***
+            st.dataframe(display_df, hide_index=True, column_config=column_config, use_container_width=True)
     else:
         with cols[1]:
             st.subheader(cat)
-            st.table(styled_df)
+            # *** KLÍČOVÁ ZMĚNA: Použití st.dataframe s hide_index=True ***
+            st.dataframe(display_df, hide_index=True, column_config=column_config, use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Mezera
 
@@ -451,11 +477,17 @@ if final_score >= 2: final_label = "BULLISH"
 elif final_score <= -2: final_label = "BEARISH"
 else: final_label = "NEUTRAL"
 
-# Zobrazení souhrnné tabulky (Bez jakéhokoliv barevného rozlišení)
-# SKRYTÍ INDEXU U SOUHRNNÉ TABULKY
-styled_summary = summary_df.style.format({"Total Points":"{:+d}"}).hide(axis="index")
+# Konfigurace sloupců pro souhrnnou tabulku
+summary_column_config = {
+    "Total Points": st.column_config.NumberColumn(
+        "Total Points",
+        format="%+d"
+    )
+}
 
-st.table(styled_summary) 
+# Zobrazení souhrnné tabulky
+# *** KLÍČOVÁ ZMĚNA: Použití st.dataframe s hide_index=True ***
+st.dataframe(summary_df, hide_index=True, column_config=summary_column_config, use_container_width=True) 
 
 # Podtržení Celkového skóre (bez rámečku, CENTROVÁNO)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTROVÁNÍ RODIČ
