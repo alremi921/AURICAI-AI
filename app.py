@@ -417,7 +417,7 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spac
 # 4. FUNDAMENTAL EVALUATION AND AI ANALYSIS (Section #0E1117)
 # -------------------------
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.header("Fundamental Evaluation") 
+st.header("Fundamental Evaluation") # Changed to English
 
 summary_rows = []
 total_combined_score = 0
@@ -449,11 +449,11 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 # Highlight Total Score (no border, CENTERED)
 st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTERING PARENT
-st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
+st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True) # Changed to English
 st.markdown("</div>", unsafe_allow_html=True)
 
 # AI Assessment (white text, simplified text)
-st.subheader("AI Fundamental Assessment")
+st.subheader("AI Fundamental Assessment") # Changed to English
 ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
 st.info(ai_text_content)
 st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
@@ -463,7 +463,7 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spac
 # 5. FUNDAMENTAL CATEGORIES CHART (Section #0E1117)
 # -------------------------
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.header("Fundamental Categories Chart") 
+st.header("Fundamental Categories Chart") # Changed to English
 
 viz_df = df_scored.copy() 
 viz_df["DateSimple"] = viz_df["DateParsed"].dt.date
@@ -485,7 +485,7 @@ if not viz_agg.empty:
     )
     st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("Not enough data for the chart.")
+    st.info("Not enough data for the chart.") # Changed to English
 st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
@@ -494,7 +494,7 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spac
 # -------------------------
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
 # Changed name
-st.header("U.S. Dollar Index Seasonality Chart")
+st.header("U.S. Dollar Index Seasonality Chart") # Changed to English
 
 df_seasonality = load_seasonality_data()
 use_mock_data = False
@@ -503,7 +503,7 @@ if df_seasonality is None:
     # If file load fails or is missing, use mock data
     df_seasonality = generate_dxy_seasonality_data()
     use_mock_data = True
-    st.info(f"Note: Could not load or process seasonality file. Displaying MOCK seasonality data. Please ensure '{DXY_HISTORY_PATH}' is correctly formatted (Month,Return) and contains English month names if file is used.")
+    st.info(f"Note: Could not load or process seasonality file. Displaying MOCK seasonality data. Please ensure '{DXY_HISTORY_PATH}' is correctly formatted (Month,Return) and contains English month names if file is used.") # Changed to English
 
 
 y_column = "Return"
@@ -540,10 +540,10 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spac
 # 6. EXPORT / DOWNLOAD (Section #0E1117)
 # -------------------------
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.header("Export / Download")
+st.header("Export / Download") # Changed to English
 
 csv_all = df_high.sort_values("DateParsed", ascending=False)[
     ["DateDisplay","Category","Report","Actual","Forecast","Previous","Points"]
 ].rename(columns={"DateDisplay":"Date"})
-st.download_button("Download Events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_manual.csv", "text/csv")
+st.download_button("Download Events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_manual.csv", "text/csv") # Changed to English
 st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
