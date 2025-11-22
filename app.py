@@ -91,13 +91,19 @@ p, div, label {{
     margin-right: auto;
     border-radius: 0px !important; /* Ostré rohy */
     border: none !important;
+    /* Zajistíme, aby pozadí celého kontejneru pro tabulky nebylo černé */
+    background-color: transparent !important;
 }}
 /* Cílení na buňky a hlavičky tabulky pro krémovou barvu a ostré rohy */
-.stDataFrame table thead th, .stDataFrame table tbody td, .stDataFrame table thead {{
+.stDataFrame table thead th, .stDataFrame table tbody td, .stTable table thead th, .stTable table tbody td {{
     background-color: {BG_CREAM} !important;
     color: {TEXT_BLACK} !important;
     border: 1px solid {TEXT_BLACK}; /* Čisté ostré rozdělení */
     border-radius: 0px !important;
+}}
+/* Nastavení pozadí celkové tabulky */
+.stTable table {{
+    background-color: {BG_CREAM} !important;
 }}
 
 /* Oprava: Cílení na AI box (st.info) - ZRUŠIT MODROU BARVU */
@@ -137,11 +143,6 @@ div[data-testid="stAlert"] {{
 }}
 .section-black h2, .section-black h3, .section-black h4 {{
     color: {TEXT_CREAM} !important;
-}}
-/* Nastavení, aby v CREAM sekci byly tabulky krémové (proti chybě) */
-.section-cream .stDataFrame table thead th, .section-cream .stDataFrame table tbody td {{
-    background-color: {BG_CREAM} !important;
-    color: {TEXT_BLACK} !important;
 }}
 
 </style>
@@ -276,7 +277,6 @@ for i, cat in enumerate(unique_categories):
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            # Důležité: Tímto se zajistí krémové pozadí buněk a ostré rohy
             st.dataframe(styled_df, use_container_width=True)
     else:
         with cols[1]:
@@ -310,11 +310,11 @@ if final_score >= 2: final_label = "Bullish pro USD"
 elif final_score <= -2: final_label = "Bearish pro USD"
 else: final_label = "Neutral pro USD"
 
-# Zobrazení standardní tabulky (pozadí bude #F2EEDB z CSS)
+# Zobrazení standardní tabulky (Vyhodnocení fundamentu - bude krémová)
 st.table(summary_df.style.format({"Total Points":"{:+d}"})) 
 
 # Podtržení Celkového skóre (v Black sekci, text je CREAM)
-st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: **{final_score:+d}** — **{final_label}**</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='score-line' style='color:{TEXT_CREAM};'>Celkové fundamentální skóre: {final_score:+d} — {final_label}</div>", unsafe_allow_html=True)
 
 # AI Vyhodnocení (bílý text, obrys modrého čtverce, zjednodušený text)
 st.subheader("AI Fundamentální Vyhodnocení")
@@ -324,9 +324,9 @@ st.info(ai_text_content)
 st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
 
 # -------------------------
-# 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ (Sekce #F2EEDB)
+# 5. GRAF FUNDAMENTÁLNÍCH KATEGORIÍ (Sekce #0C0C0C)
 # -------------------------
-st.markdown("<div class='section-cream'>", unsafe_allow_html=True)
+st.markdown("<div class='section-black'>", unsafe_allow_html=True)
 st.header("Graf fundamentálních kategorií") 
 
 viz_df = df_scored.copy() 
@@ -337,17 +337,17 @@ if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Body podle kategorie v čase (denní agregát z proběhlých událostí)")
     
-    # Oprava Plotly: Používáme string proměnné místo chybného formátování {variable}
+    # Oprava Plotly: Používáme F-string pro vkládání proměnných
     fig.update_layout(
-        plot_bgcolor={BG_CREAM}, 
-        paper_bgcolor={BG_CREAM},
-        font_color={TEXT_BLACK},
-        title_font_color={TEXT_BLACK}
+        plot_bgcolor=f"{BG_BLACK}", 
+        paper_bgcolor=f"{BG_BLACK}",
+        font_color=f"{TEXT_CREAM}",
+        title_font_color=f"{TEXT_CREAM}"
     )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Není dost dat pro graf.")
-st.markdown("</div>", unsafe_allow_html=True) # Konec sekce CREAM
+st.markdown("</div>", unsafe_allow_html=True) # Konec sekce BLACK
     
 # -------------------------
 # 6. Export (Sekce #0C0C0C)
