@@ -433,31 +433,52 @@ if df_seasonality_heatmap.empty:
 else:
     month_order = df_seasonality_lines['Month'].tolist() if not df_seasonality_lines.empty else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    # Data jsou ošetřena proti chybě desetinných čísel ve funkci load_seasonality_heatmap_data()
-    max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
+    # 1. Výpočet pro striktně dvoubarevnou stupnici (červená/zelená)
+    min_val = df_seasonality_heatmap['Return'].min()
+    max_val = df_seasonality_heatmap['Return'].max()
+    range_val = max_val - min_val
+
+    # Vypočítáme normalizovanou pozici nuly v rozsahu [0, 1]
+    # Tato hodnota je klíčová pro ostrý přechod barvy na 0
+    P0 = (0 - min_val) / range_val if range_val != 0 else 0.5
     
+    # Definice ostře přecházející barevné škály: Červená pro < 0, Zelená pro >= 0
+    # Použijeme slight epsilon (1e-9) pro jistotu ostrého přechodu v Plotly
+    custom_two_color_scale = [
+        [0.0, 'red'],
+        [P0 - 1e-9, 'red'], # Vše pod nulou je červené
+        [P0 + 1e-9, 'green'], # Vše nad nulou je zelené
+        [1.0, 'green']
+    ]
+
+    # 2. Přidání textového popisku (formátováno na dvě desetinná místa)
+    df_seasonality_heatmap['Return_Text'] = df_seasonality_heatmap['Return'].apply(lambda x: f"{x:+.2f}")
+
     # Seznam unikátních let pro explicitní řazení Y-osy
     year_order = sorted(df_seasonality_heatmap['Year'].unique(), key=lambda x: int(x), reverse=True)
     
     fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
                                  x="Month", 
                                  y="Year", 
-                                 z="Return",
-                                 category_orders={"Month": month_order, "Year": year_order}, # Použití explicitního řazení let
-                                 # ZMĚNA ZDE: Použití RdBu škály (Red-White-Blue)
-                                 # Kladné výnosy jsou modré (tmavě modrá pro vysoké), záporné jsou červené.
-                                 color_continuous_scale='RdBu', 
-                                 range_color=[-max_abs, max_abs],
-                                 title="Monthly Return Heatmap by Year")
+                                 z="Return", # Používá se pro určení barvy
+                                 text_auto=False, # Vypneme automatický text
+                                 text=df_seasonality_heatmap['Return_Text'], # Nastavíme vlastní text
+                                 category_orders={"Month": month_order, "Year": year_order},
+                                 color_continuous_scale=custom_two_color_scale, # Aplikace dvoubarevné škály
+                                 range_color=[min_val, max_val], # Rozsah musí pokrýt celá data
+                                 title="Monthly Return Heatmap by Year (Red=Negative, Green=Positive)")
 
-    # Plotly dynamic styling (Transparentní pro system preference)
+    # Plotly dynamic styling
     fig_heatmap.update_layout(
         plot_bgcolor="rgba(0,0,0,0)", 
         paper_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(tickangle=45, gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
         yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-        coloraxis_colorbar=dict(title="Return (%)")
+        coloraxis_colorbar=dict(title="Return (%)", tickvals=[min_val, 0, max_val], ticktext=[f"{min_val:.2f} (Negative)", "0.00", f"{max_val:.2f} (Positive)"]) 
     )
+    # Zajištění, že text je viditelný a bez pop-upu
+    fig_heatmap.update_traces(texttemplate='%{text}', hovertemplate=None, selector=dict(type='heatmap'))
+
     st.plotly_chart(fig_heatmap, use_container_width=True)
 
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) 
