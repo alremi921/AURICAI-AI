@@ -439,11 +439,9 @@ else:
     range_val = max_val - min_val
 
     # Vypočítáme normalizovanou pozici nuly v rozsahu [0, 1]
-    # Tato hodnota je klíčová pro ostrý přechod barvy na 0
     P0 = (0 - min_val) / range_val if range_val != 0 else 0.5
     
     # Definice ostře přecházející barevné škály: Červená pro < 0, Zelená pro >= 0
-    # Použijeme slight epsilon (1e-9) pro jistotu ostrého přechodu v Plotly
     custom_two_color_scale = [
         [0.0, 'red'],
         [P0 - 1e-9, 'red'], # Vše pod nulou je červené
@@ -462,7 +460,8 @@ else:
                                  y="Year", 
                                  z="Return", # Používá se pro určení barvy
                                  text_auto=False, # Vypneme automatický text
-                                 text=df_seasonality_heatmap['Return_Text'], # Nastavíme vlastní text
+                                 # OPRAVA ZDE: Předáváme název sloupce jako řetězec, ne Pandas Series.
+                                 text='Return_Text', # Nastavíme vlastní text
                                  category_orders={"Month": month_order, "Year": year_order},
                                  color_continuous_scale=custom_two_color_scale, # Aplikace dvoubarevné škály
                                  range_color=[min_val, max_val], # Rozsah musí pokrýt celá data
