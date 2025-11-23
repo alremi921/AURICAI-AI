@@ -45,7 +45,7 @@ TABLE_BG = current_theme['TABLE_BG']
 
 # File paths
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-DXY_LINES_PATH = "dxy_seasonality_lines_multi.csv.txt" 
+DXY_LINES_PATH = "dxy_linechart_history.csv.txt" # Původní název souboru
 DXY_HEATMAP_PATH = "dxy_seasonality_heatmap_history.csv.txt" 
 
 LOOKBACK_DAYS = 90  
@@ -207,8 +207,6 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     width: 100%; 
 }}
 
-/* Removed stExpander styling as expanders are now removed */
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -221,7 +219,8 @@ def clean_num(x):
     s = str(x).strip()
     if s.startswith('.'): s = s[1:]
     if s == "" or s == "-" or s.lower() == "n/a" or s.lower() == "nan": return None
-    s = s.replace("%", "").replace(",", "").replace("K", "000").replace("M", "000000").replace("B", "000000000")
+    # Při načítání CSV souboru se ujistíme, že data jsou správně parsována (např. nahrazením čárky tečkou)
+    s = s.replace(",", ".").replace("%", "").replace("K", "000").replace("M", "000000").replace("B", "000000000")
     try: return float(s)
     except: return None
 
@@ -252,12 +251,13 @@ def load_seasonality_lines_data():
     if not os.path.exists(DXY_LINES_PATH):
         return None
     try:
+        # Použijeme decimal='.' a sep=',' pro konzistentní načítání
         df = pd.read_csv(DXY_LINES_PATH, decimal='.', sep=',') 
         
         expected_cols = ['Month', 'Return_15Y', 'Return_10Y', 'Return_5Y']
         if not all(col in df.columns for col in expected_cols):
-            # Instead of error, return None to trigger mock data / skip chart
-            return None
+            # Pokud chybí sloupce, vrátíme prázdný DataFrame, ne None, abychom zamezili KeyError v .melt()
+            return pd.DataFrame()
         
         month_to_index = {
             "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, 
@@ -266,12 +266,12 @@ def load_seasonality_lines_data():
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
-             return None
+             return pd.DataFrame()
              
         df = df.sort_values('Month_Index').reset_index(drop=True)
         return df
     except Exception:
-        return None
+        return pd.DataFrame()
         
 # Loads heatmap seasonality data
 @st.cache_data
@@ -279,12 +279,19 @@ def load_seasonality_heatmap_data():
     if not os.path.exists(DXY_HEATMAP_PATH):
         return None
     try:
+        # Použijeme engine='python' a upravený regex pro oddělovače (problém s čárkou v May 2025)
+        # NEBO POUŽIJEME: sep=',' a ubezpečíme se, že všechna data jsou s tečkou
         df = pd.read_csv(DXY_HEATMAP_PATH, decimal='.', sep=',') 
         
         expected_cols = ['Year', 'Month', 'Return']
         if not all(col in df.columns for col in expected_cols):
             return None
             
+        # Převedeme sloupec Return, kde nahradíme čárky tečkami (kvůli May 2025 datům)
+        df['Return'] = df['Return'].astype(str).str.replace(',', '.', regex=False)
+        df['Return'] = pd.to_numeric(df['Return'], errors='coerce')
+        df = df[df['Return'].notna()] # Odstraníme řádky s neparsovatelnými daty
+        
         df['Year'] = df['Year'].astype(str)
         
         month_to_index = {
@@ -339,13 +346,14 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     return summary
 
 def generate_dxy_seasonality_data():
-    # Mock data for DXY lines (used if CSV file is missing)
+    # Mock data for DXY lines (used if CSV file is missing or invalid)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    mock_returns_15Y = [0.30, 0.20, 0.05, -0.30, 0.15, -0.05, -0.20, 0.05, 0.50, 0.35, 0.25, -0.50]
-    mock_returns_10Y = [0.40, 0.35, 0.10, -0.45, 0.20, -0.15, -0.30, 0.10, 0.70, 0.45, 0.30, -0.60]
-    mock_returns_5Y = [0.55, 0.40, 0.15, -0.60, 0.30, -0.25, -0.40, 0.15, 0.90, 0.50, 0.25, -0.80]
+    # Mock data based on the provided values in dxy_linechart_history.csv.txt [cite: 3]
+    mock_returns_15Y = [0.16, 0.52, 0.03, -0.65, 1.19, -0.33, -0.35, 0.10, 0.62, 0.40, 0.67, -0.56]
+    mock_returns_10Y = [0.35, 0.55, 0.05, -0.60, 0.90, -0.30, -0.50, 0.10, 0.70, 0.45, 0.80, -0.60]
+    mock_returns_5Y = [0.15, 0.40, 0.20, -0.45, 1.20, -0.10, -0.35, 0.00, 0.55, 0.30, 0.65, -0.40]
 
     
     df = pd.DataFrame({
@@ -423,7 +431,7 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Use dynamic styler and dynamic-table class (Hiding index row is crucial here)
+    # Use dynamic styler (table is in original state, without row index)
     styled_df = display_df.style.set_table_styles(dynamic_styler).hide(axis="index")
 
     if i % 2 == 0:
@@ -467,7 +475,7 @@ if final_score >= 2: final_label = "BULLISH"
 elif final_score <= -2: final_label = "BEARISH"
 else: final_label = "NEUTRAL"
 
-# Use dynamic styler
+# Use dynamic styler (table is in original state, without row index)
 styled_summary = summary_df.style.set_table_styles(dynamic_styler).hide(axis="index").format({"Total Points":"{:+d}"})
 
 # Display summary table
@@ -526,12 +534,13 @@ st.header("U.S. Dollar Index Seasonality Charts")
 st.subheader("Average Monthly Return: 15Y vs. 10Y vs. 5Y")
 df_seasonality_lines = load_seasonality_lines_data()
 
-if df_seasonality_lines is None:
+# Použijeme MOCK data pouze v případě, že se načtení nepodařilo (tedy df je prázdné)
+if df_seasonality_lines.empty:
     df_seasonality_lines = generate_dxy_seasonality_data()
-    st.info(f"Note: Could not load or process seasonality file '{DXY_LINES_PATH}'. Displaying MOCK seasonality data.")
+    st.info(f"Note: Could not load or process seasonality file '{DXY_LINES_PATH}' correctly. Displaying MOCK seasonality data based on expected columns.")
     
-# --- Check if we have valid data (even mock data) to prevent KeyError ---
-if df_seasonality_lines is not None and not df_seasonality_lines.empty:
+# --- Vykreslení Line Chart ---
+if not df_seasonality_lines.empty:
     
     df_melted = df_seasonality_lines.melt(
         id_vars=['Month', 'Month_Index'], 
@@ -570,12 +579,14 @@ else:
 st.subheader("USDX Monthly Return Heatmap (By Year)")
 df_seasonality_heatmap = load_seasonality_heatmap_data()
 
+# --- Vykreslení Heatmap Chart ---
 if df_seasonality_heatmap is None or df_seasonality_heatmap.empty:
-    st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or invalid. Heatmap chart is not available.")
+    st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or contains invalid data. Heatmap chart is not available.")
 else:
-    month_order = df_seasonality_lines['Month'].tolist() if df_seasonality_lines is not None else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    # Použijeme měsíční pořadí z line chart, pokud je dostupné, jinak základní řazení
+    month_order = df_seasonality_lines['Month'].tolist() if not df_seasonality_lines.empty else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    # Calculate max_abs only if data is present
+    # Využijeme data z Heatmap pro max_abs, kde už jsou ošetřeny čárky v desetinných číslech
     max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
     
     fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
