@@ -101,7 +101,7 @@ def clean_num(x):
     s = str(x).strip()
     if s.startswith('.'): s = s[1:]
     if s == "" or s == "-" or s.lower() == "n/a" or s.lower() == "nan": return None
-    # Oprava: Použijeme replace(',', '.') pro ošetření evropského formátu desetinných čísel (čárka)
+    # Použijeme replace(',', '.') pro ošetření evropského formátu desetinných čísel (čárka)
     s = s.replace(",", ".").replace("%", "").replace("K", "000").replace("M", "000000").replace("B", "000000000")
     try: return float(s)
     except: return None
@@ -153,13 +153,13 @@ def load_seasonality_lines_data():
     except Exception:
         return pd.DataFrame()
         
-# Loads heatmap seasonality data (S ROBUSTNÍ OPRAVOU DECIMAL SEPARATORU)
+# Loads heatmap seasonality data (S ROBUSTNÍ A EXPLICITNÍ TYPOVOU OPRAVOU)
 @st.cache_data
 def load_seasonality_heatmap_data():
     if not os.path.exists(DXY_HEATMAP_PATH):
         return pd.DataFrame()
     try:
-        # Použijeme sep=',' pro načtení CSV
+        # Přečteme soubor s defaultním oddělovačem čárky
         df = pd.read_csv(DXY_HEATMAP_PATH, sep=',') 
         
         expected_cols = ['Year', 'Month', 'Return']
@@ -168,8 +168,9 @@ def load_seasonality_heatmap_data():
             
         # OPRAVA CHYBY: Manuálně parsujeme sloupec 'Return' (nahradíme čárky tečkami)
         df['Return'] = df['Return'].astype(str).str.replace(',', '.', regex=False)
-        df['Return'] = pd.to_numeric(df['Return'], errors='coerce')
-        df = df[df['Return'].notna()] 
+        # EXPLICITNÍ TYPOVÁ KONVERZE A ZAMĚŘENÍ NA CHYBĚJÍCÍ DATA
+        df['Return'] = pd.to_numeric(df['Return'], errors='coerce', downcast='float')
+        df = df[df['Return'].notna()] # Odstraníme řádky, kde se parsování nepodařilo
         
         df['Year'] = df['Year'].astype(str)
         
@@ -229,6 +230,7 @@ def generate_dxy_seasonality_data():
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
+    # Mock data based on the provided values in dxy_linechart_history.csv.txt
     mock_returns_15Y = [0.16, 0.52, 0.03, -0.65, 1.19, -0.33, -0.35, 0.10, 0.62, 0.40, 0.67, -0.56]
     mock_returns_10Y = [0.35, 0.55, 0.05, -0.60, 0.90, -0.30, -0.50, 0.10, 0.70, 0.45, 0.80, -0.60]
     mock_returns_5Y = [0.15, 0.40, 0.20, -0.45, 1.20, -0.10, -0.35, 0.00, 0.55, 0.30, 0.65, -0.40]
@@ -277,7 +279,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) 
 
 # -------------------------
-# 3. FUNDAMENTAL NEWS BREAKDOWN BY CATEGORY (Používá původní st.dataframe)
+# 3. FUNDAMENTAL NEWS BREAKDOWN BY CATEGORY (Používá st.dataframe)
 # -------------------------
 st.header("Fundamental News Breakdown by Category")
 
@@ -433,13 +435,17 @@ if df_seasonality_heatmap.empty:
 else:
     month_order = df_seasonality_lines['Month'].tolist() if not df_seasonality_lines.empty else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
+    # Data jsou ošetřena proti chybě desetinných čísel ve funkci load_seasonality_heatmap_data()
     max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
+    
+    # Seznam unikátních let pro explicitní řazení Y-osy
+    year_order = sorted(df_seasonality_heatmap['Year'].unique(), key=lambda x: int(x), reverse=True)
     
     fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
                                  x="Month", 
                                  y="Year", 
                                  z="Return",
-                                 category_orders={"Month": month_order, "Year": sorted(df_seasonality_heatmap['Year'].unique(), reverse=True)},
+                                 category_orders={"Month": month_order, "Year": year_order}, # Použití explicitního řazení let
                                  color_continuous_scale='RdYlGn', 
                                  range_color=[-max_abs, max_abs],
                                  title="Monthly Return Heatmap by Year")
