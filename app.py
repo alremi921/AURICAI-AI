@@ -5,22 +5,49 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import os 
 
+st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
+
 # -------------------------
 # COLOR AND PATH DEFINITIONS
 # -------------------------
-BG_BLACK = '#0E1117' # Dark Streamlit Background
-BG_CREAM = '#FFFFFF' # Pure White Background (for CREAM section)
-TEXT_CREAM = '#FFFFFF' # Pure White Text
-TEXT_BLACK = '#0E1117' # Dark text color (for CREAM section)
 
-# New color for borders and chart lines
-BORDER_DARK = '#31333F' 
+# Define color themes
+THEME_COLORS = {
+    'dark': {
+        'BG_PRIMARY': '#0E1117',   # Hlavní tmavé pozadí
+        'BG_SECONDARY': '#FFFFFF', # Světlé pozadí pro kontrastní sekci (kategorie)
+        'TEXT_PRIMARY': '#FFFFFF', # Bílý text na tmavém pozadí
+        'TEXT_SECONDARY': '#0E1117', # Tmavý text na světlém pozadí
+        'BORDER_LINE': '#31333F',  # Tmavá linka / mřížka
+        'TABLE_BG': '#0E1117',     # Pozadí tabulky (stejné jako BG_PRIMARY)
+    },
+    'light': {
+        'BG_PRIMARY': '#FFFFFF',   # Hlavní světlé pozadí
+        'BG_SECONDARY': '#F0F2F6', # Světle šedé pozadí pro kontrastní sekci
+        'TEXT_PRIMARY': '#0E1117', # Tmavý text na světlém pozadí
+        'TEXT_SECONDARY': '#0E1117', # Tmavý text na světlém pozadí
+        'BORDER_LINE': '#CCCCCC',  # Světlá linka / mřížka
+        'TABLE_BG': '#FFFFFF',     # Pozadí tabulky (stejné jako BG_PRIMARY)
+    }
+}
 
+# 1. Theme Selector in sidebar
+theme_name = st.sidebar.radio("Zvolte motiv:", ('Dark', 'Light'), index=0)
+current_theme = THEME_COLORS[theme_name.lower()]
+
+# Assign current theme colors to variables for simpler use
+BG_PRIMARY = current_theme['BG_PRIMARY']
+BG_SECONDARY = current_theme['BG_SECONDARY']
+TEXT_PRIMARY = current_theme['TEXT_PRIMARY']
+TEXT_SECONDARY = current_theme['TEXT_SECONDARY']
+BORDER_LINE = current_theme['BORDER_LINE']
+TABLE_BG = current_theme['TABLE_BG']
+
+# File paths
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-# --- NEW FILE PATHS FOR SEASONALITY ---
 DXY_LINES_PATH = "dxy_seasonality_lines_multi.csv.txt" 
 DXY_HEATMAP_PATH = "dxy_seasonality_heatmap_history.csv.txt" 
-# -------------------------------------
+
 LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
@@ -31,25 +58,25 @@ CATEGORY_KEYWORDS = {
 }
 
 # -------------------------
-# CORE CSS FOR STABILITY AND DESIGN
+# CORE CSS FOR STABILITY AND DESIGN (DYNAMICALLY GENERATED)
 # -------------------------
 st.markdown(f"""
 <style>
-/* 1. Import Google Fonts (For reliable fallbacks) */
+/* 1. Import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Montserrat:wght@300;400;700&display=swap');
 
 /* 2. Streamlit global settings */
 .stApp {{
     padding-top: 20px;
-    background-color: {BG_BLACK}; 
-    color: {TEXT_CREAM}; /* Pure White Text */
+    background-color: {BG_PRIMARY}; 
+    color: {TEXT_PRIMARY}; 
 }}
 
 /* 3. Styling headers (Montserrat Light, Uppercase) */
 h1, h2, h3, h4, .small-title {{
     font-family: 'Montserrat', sans-serif !important; 
     text-align: center;
-    color: {TEXT_CREAM};
+    color: {TEXT_PRIMARY};
     font-weight: 300; 
     text-transform: uppercase;
     letter-spacing: 3px;
@@ -65,7 +92,7 @@ h1, h2, h3, h4, .small-title {{
 p, div, label {{
     font-family: 'Montserrat', sans-serif !important;
     font-weight: 300; 
-    color: {TEXT_CREAM}; /* Default text color */
+    color: {TEXT_PRIMARY}; 
 }}
 /* Motto - Libre Baskerville, Uppercase */
 .motto {{
@@ -76,31 +103,31 @@ p, div, label {{
     margin-top: -10px;
     font-size: 1.1em;
     text-align: center; 
-    color: {TEXT_CREAM};
+    color: {TEXT_PRIMARY};
 }}
 
-/* Set text color in the white section */
-.section-cream p, .section-cream div, .section-cream label {{
-    color: {TEXT_BLACK}; 
+/* Set text color in the secondary section */
+.section-secondary p, .section-secondary div, .section-secondary label {{
+    color: {TEXT_SECONDARY}; 
 }}
 
-/* *** CRITICAL FIX: AI BOX (st.info) - REMOVE BLUE FILL *** */
+/* *** CRITICAL FIX: AI BOX (st.info) - DYNAMIC COLORS *** */
 div[data-testid="stAlert"] {{
-    background-color: {BG_BLACK} !important; 
-    border: 1px solid {TEXT_CREAM} !important; 
-    color: {TEXT_CREAM} !important; 
+    background-color: {BG_PRIMARY} !important; 
+    border: 1px solid {TEXT_PRIMARY} !important; 
+    color: {TEXT_PRIMARY} !important; 
     padding: 20px;
     margin-top: 10px;
 }}
 div[data-testid="stAlert"] div[role="alert"] {{
-    background-color: {BG_BLACK} !important; 
+    background-color: {BG_PRIMARY} !important; 
 }}
 div[data-testid="stAlert"] svg {{
-    fill: {TEXT_CREAM} !important; 
+    fill: {TEXT_PRIMARY} !important; 
 }}
 
 
-/* *** Targeting PANDAS STYLER for dark tables (st.table method) *** */
+/* *** Targeting PANDAS STYLER for dynamic tables *** */
 
 /* 1. Aggressive target to remove wrapper borders from st.table */
 div[data-testid="stTable"] {{
@@ -108,28 +135,28 @@ div[data-testid="stTable"] {{
     border: none !important;
 }}
 
-/* 2. Styling the table itself, embedded in the .dark-table wrapper */
-.dark-table table thead th, 
-.dark-table table tbody td {{
-    background-color: {BG_BLACK} !important; 
-    color: {TEXT_CREAM} !important; /* Pure white text on dark background */
-    border: 1px solid {BORDER_DARK} !important; /* Dark table border */
+/* 2. Styling the table itself, embedded in the .dynamic-table wrapper */
+.dynamic-table table thead th, 
+.dynamic-table table tbody td {{
+    background-color: {TABLE_BG} !important; 
+    color: {TEXT_PRIMARY} !important; 
+    border: 1px solid {BORDER_LINE} !important; 
     border-radius: 0px !important;
     box-shadow: none !important;
 }}
-.dark-table table {{
-    background-color: {BG_BLACK} !important;
+.dynamic-table table {{
+    background-color: {TABLE_BG} !important;
     border-radius: 0px !important;
     border: none !important;
-    border-collapse: collapse; /* Ensures sharp edges */
+    border-collapse: collapse; 
 }}
 
-/* Prevents text wrapping in table headers in categories section (fixes "Actua" and "l") */
-.dark-table table th {{
+/* Prevents text wrapping in table headers in categories section */
+.dynamic-table table th {{
     white-space: nowrap !important;
 }}
 
-/* Centering Total Score (no border) */
+/* Centering Total Score */
 .score-line-container {{
     border: none; 
     padding: 0;
@@ -141,25 +168,25 @@ div[data-testid="stTable"] {{
     font-size: 1.5em;
     font-weight: 400; 
     display: block; 
-    color: {TEXT_CREAM}; 
+    color: {TEXT_PRIMARY}; 
 }}
 
 /* --- COLOR SECTIONS (Alternating Background) --- */
-.section-black {{
-    background-color: {BG_BLACK};
-    color: {TEXT_CREAM};
+.section-primary {{ 
+    background-color: {BG_PRIMARY};
+    color: {TEXT_PRIMARY};
     padding: 20px 0;
 }}
-.section-cream {{
-    background-color: {BG_CREAM};
-    color: {TEXT_BLACK};
+.section-secondary {{ 
+    background-color: {BG_SECONDARY};
+    color: {TEXT_SECONDARY};
     padding: 20px 0;
 }}
-.section-cream h2, .section-cream h3, .section-cream h4 {{
-    color: {TEXT_BLACK} !important;
+.section-secondary h2, .section-secondary h3, .section-secondary h4 {{
+    color: {TEXT_SECONDARY} !important;
 }}
-.section-black h2, .section-black h3, .section-black h4 {{
-    color: {TEXT_CREAM} !important;
+.section-primary h2, .section-primary h3, .section-primary h4 {{
+    color: {TEXT_PRIMARY} !important;
 }}
 
 /* Add spacing between sections */
@@ -180,12 +207,12 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     width: 100%; 
 }}
 
-/* Styling for st.expander - ensure it uses the dark theme */
+/* Styling for st.expander - ensure it uses the primary theme */
 .stExpander {{
-    border: 1px solid {BORDER_DARK};
+    border: 1px solid {BORDER_LINE};
     border-radius: 5px;
-    background-color: {BG_BLACK};
-    color: {TEXT_CREAM};
+    background-color: {BG_PRIMARY};
+    color: {TEXT_PRIMARY};
     padding: 10px;
     margin-bottom: 20px;
 }}
@@ -198,25 +225,10 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
 </style>
 """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
-
 # -------------------------
-# DATA CONFIGURATION
+# DATA CONFIGURATION AND HELPERS
 # -------------------------
-CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-DXY_LINES_PATH = "dxy_seasonality_lines_multi.csv.txt" # NEW FILE PATH 1
-DXY_HEATMAP_PATH = "dxy_seasonality_heatmap_history.csv.txt" # NEW FILE PATH 2
 
-LOOKBACK_DAYS = 90  
-TODAY = datetime.utcnow()
-START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
-
-# CATEGORY NAMES ARE ALREADY IN ENGLISH IN DATA FILE
-CATEGORY_KEYWORDS = {
-    "Inflation": [], "Interest Rates": [], "Labor Market": [], "Economic Activity": []
-}
-
-# --- HELPER FUNCTIONS ---
 def clean_num(x):
     if x is None: return None
     s = str(x).strip()
@@ -242,14 +254,12 @@ def load_events_from_csv():
         df = df[df["DateParsed"].notna()]
         df = df[df["DateParsed"] >= pd.Timestamp(START_DATE)]
         
-        # Data file must now contain English categories (Inflation, Labor Market, etc.)
-        
         return df.sort_values("DateParsed", ascending=False).reset_index(drop=True)
     except Exception as e:
         st.error(f"Could not load or process the CSV file. Error: {e}")
         return pd.DataFrame()
 
-# NEW FUNCTION: Loads multi-line seasonality data
+# Loads multi-line seasonality data
 @st.cache_data
 def load_seasonality_lines_data():
     if not os.path.exists(DXY_LINES_PATH):
@@ -257,13 +267,11 @@ def load_seasonality_lines_data():
     try:
         df = pd.read_csv(DXY_LINES_PATH, decimal='.', sep=',') 
         
-        # Define expected columns for plotting
         expected_cols = ['Month', 'Return_15Y', 'Return_10Y', 'Return_5Y']
         if not all(col in df.columns for col in expected_cols):
             st.warning(f"Warning: Seasonality lines file '{DXY_LINES_PATH}' missing expected columns. Using mock data for lines.")
             return None
         
-        # Converts month names to index for correct plotting order
         month_to_index = {
             "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, 
             "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
@@ -280,7 +288,7 @@ def load_seasonality_lines_data():
         st.warning(f"Warning: Could not process seasonality lines file. Error: {e}. Using mock data for lines.")
         return None
         
-# NEW FUNCTION: Loads heatmap seasonality data
+# Loads heatmap seasonality data
 @st.cache_data
 def load_seasonality_heatmap_data():
     if not os.path.exists(DXY_HEATMAP_PATH):
@@ -288,15 +296,13 @@ def load_seasonality_heatmap_data():
     try:
         df = pd.read_csv(DXY_HEATMAP_PATH, decimal='.', sep=',') 
         
-        # Define expected columns for plotting
         expected_cols = ['Year', 'Month', 'Return']
         if not all(col in df.columns for col in expected_cols):
             st.warning(f"Warning: Seasonality heatmap file '{DXY_HEATMAP_PATH}' missing expected columns. Not displaying heatmap.")
             return None
             
-        df['Year'] = df['Year'].astype(str) # Ensure year is treated as discrete category
+        df['Year'] = df['Year'].astype(str)
         
-        # Check for month consistency
         month_to_index = {
             "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, 
             "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
@@ -307,7 +313,6 @@ def load_seasonality_heatmap_data():
              st.warning(f"Warning: Seasonality heatmap file '{DXY_HEATMAP_PATH}' contains invalid month names. Not displaying heatmap.")
              return None
              
-        # Sort by year (descending for heatmap visual appeal) and then month
         df = df.sort_values(['Year', 'Month_Index'], ascending=[False, True]).reset_index(drop=True)
         return df
     except Exception as e:
@@ -322,7 +327,6 @@ def score_event(row):
     if a < f: return -1
     return 0
 
-# LOGIC: Bullish >=+2, Neutral 1/0/-1, Bearish <=-2
 def evaluate_category(df_cat):
     df_scored = df_cat[pd.to_numeric(df_cat['Points'], errors='coerce').notna()]
     total = int(df_scored["Points"].sum())
@@ -332,10 +336,7 @@ def evaluate_category(df_cat):
     else: label = "Neutral" # Catches 1, 0, -1
     return total, label
 
-# SHORT AI summary (approx 3-4 sentences)
 def generate_ai_summary(summary_df, final_score, overall_label):
-    
-    # Use safe indexing
     if not summary_df.empty:
         strongest = summary_df.sort_values('Total Points', ascending=False).iloc[0]
         weakest = summary_df.sort_values('Total Points', ascending=True).iloc[0]
@@ -355,15 +356,27 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     
     return summary
 
+# Defines Pandas Styler dynamically based on theme
+dynamic_styler = [
+    {'selector': 'th, td',
+     'props': [('background-color', TABLE_BG), 
+               ('color', TEXT_PRIMARY),
+               ('border', f'1px solid {BORDER_LINE}'), 
+               ('border-radius', '0')]},
+    {'selector': 'table',
+     'props': [('border-collapse', 'collapse')]}
+]
+
 # --- HELPER FUNCTION FOR SEASONALITY (DXY MOCK DATA) ---
 def generate_dxy_seasonality_data():
-    # Simulated data of the average monthly return of the USD Index ($DXY)
+    # Mock data for DXY lines (used if CSV file is missing)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    # Mock data for DXY (Strong Q1/Q4, Weak Q2/Q3)
-    mock_returns_15Y = [0.2, 0.5, 0.1, -0.5, 1.0, -0.2, -0.4, 0.05, 0.6, 0.35, 0.7, -0.5]
-    mock_returns_10Y = [0.3, 0.6, 0.0, -0.6, 0.9, -0.3, -0.5, 0.1, 0.7, 0.45, 0.8, -0.6]
-    mock_returns_5Y = [0.1, 0.4, 0.2, -0.4, 1.2, -0.1, -0.3, 0.0, 0.55, 0.3, 0.65, -0.4]
+    
+    # Using the calculated mock averages from the previous step
+    mock_returns_15Y = [0.30, 0.20, 0.05, -0.30, 0.15, -0.05, -0.20, 0.05, 0.50, 0.35, 0.25, -0.50]
+    mock_returns_10Y = [0.40, 0.35, 0.10, -0.45, 0.20, -0.15, -0.30, 0.10, 0.70, 0.45, 0.30, -0.60]
+    mock_returns_5Y = [0.55, 0.40, 0.15, -0.60, 0.30, -0.25, -0.40, 0.15, 0.90, 0.50, 0.25, -0.80]
 
     
     df = pd.DataFrame({
@@ -373,7 +386,6 @@ def generate_dxy_seasonality_data():
         "Return_5Y": mock_returns_5Y
     })
     
-    # Adding index for correct plotting order
     month_to_index = {
         "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, 
         "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
@@ -382,28 +394,15 @@ def generate_dxy_seasonality_data():
     return df.set_index('Month_Index').sort_values('Month_Index')
 # -----------------------------------------------------
 
-# Defines Pandas Styler for dark background and white text
-dark_styler = [
-    {'selector': 'th, td',
-     'props': [('background-color', BG_BLACK), 
-               ('color', TEXT_CREAM),
-               ('border', f'1px solid {BORDER_DARK}'), # Use new dark line
-               ('border-radius', '0')]},
-    {'selector': 'table',
-     'props': [('border-collapse', 'collapse')]}
-]
 
 # -------------------------
 # BUILD DASHBOARD
 # -------------------------
 
-# 1. MAIN TITLE AND MOTTO (Section #0E1117)
-st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-# Small top title (Montserrat Light, Uppercase)
+# 1. MAIN TITLE AND MOTTO (Uses section-primary)
+st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
 st.markdown("<p class='small-title'>USD MACRO AI DASHBOARD</p>", unsafe_allow_html=True) 
-# Main title (Montserrat Light, Uppercase)
 st.title("AURICAI AI")
-# Motto (Libre Baskerville)
 st.markdown("<p class='motto'>\"BEAT THE ODDS\"</p>", unsafe_allow_html=True) 
 st.markdown("---")
 
@@ -420,16 +419,15 @@ df_high["DateDisplay"] = df_high["DateParsed"].dt.strftime("%Y-%m-%d %H:%M")
 
 df_scored = df_high[pd.to_numeric(df_high['Actual'], errors='coerce').notna()].copy()
 df_all_display = df_high.copy()
-st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 3. FUNDAMENTAL NEWS BREAKDOWN BY CATEGORY (Section #FFFFFF)
+# 3. FUNDAMENTAL NEWS BREAKDOWN BY CATEGORY (Uses section-secondary)
 # -------------------------
-st.markdown("<div class='section-cream'>", unsafe_allow_html=True)
+st.markdown("<div class='section-secondary'>", unsafe_allow_html=True)
 st.header("Fundamental News Breakdown by Category")
 
-# Tables in Streamlit columns (smaller width)
 cols = st.columns(2)
 
 category_frames = {}
@@ -443,35 +441,33 @@ for i, cat in enumerate(unique_categories):
     category_frames[cat] = cat_df_scored
 
     cat_df_display = cat_df_display.sort_values("DateParsed", ascending=False)
-    # Columns to display
     display_df = cat_df_display[["DateDisplay", "Report", "Actual", "Forecast", "Previous", "Points"]].rename(
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # *** KEY CHANGE: Use st.table with Pandas Styler (for reliable colors and index hiding) ***
-    styled_df = display_df.style.set_table_styles(dark_styler).hide(axis="index")
+    # Use dynamic styler and dynamic-table class
+    styled_df = display_df.style.set_table_styles(dynamic_styler).hide(axis="index")
 
     if i % 2 == 0:
         with cols[0]:
             st.subheader(cat)
-            st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+            st.markdown(f'<div class="dynamic-table">', unsafe_allow_html=True)
             st.table(styled_df)
             st.markdown('</div>', unsafe_allow_html=True)
     else:
         with cols[1]:
             st.subheader(cat)
-            st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+            st.markdown(f'<div class="dynamic-table">', unsafe_allow_html=True)
             st.table(styled_df)
             st.markdown('</div>', unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True) # End CREAM section
+st.markdown("</div>", unsafe_allow_html=True) # End SECONDARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 4. FUNDAMENTAL EVALUATION AND AI ANALYSIS (Section #0E1117)
+# 4. FUNDAMENTAL EVALUATION AND AI ANALYSIS (Uses section-primary, with expander)
 # -------------------------
-# IMPLEMENTING st.expander (rollout) for this section
 with st.expander("Fundamental Evaluation and AI Assessment", expanded=True):
-    st.markdown("<div class='section-black'>", unsafe_allow_html=True)
+    st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
     st.header("Fundamental Evaluation") 
 
     summary_rows = []
@@ -494,30 +490,30 @@ with st.expander("Fundamental Evaluation and AI Assessment", expanded=True):
     elif final_score <= -2: final_label = "BEARISH"
     else: final_label = "NEUTRAL"
 
-    # *** KEY CHANGE: Use st.table with Pandas Styler (for reliable colors and index hiding) ***
-    styled_summary = summary_df.style.set_table_styles(dark_styler).hide(axis="index").format({"Total Points":"{:+d}"})
+    # Use dynamic styler
+    styled_summary = summary_df.style.set_table_styles(dynamic_styler).hide(axis="index").format({"Total Points":"{:+d}"})
 
     # Display summary table
-    st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+    st.markdown(f'<div class="dynamic-table">', unsafe_allow_html=True)
     st.table(styled_summary) 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Highlight Total Score (no border, CENTERED)
-    st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTERING PARENT
+    # Highlight Total Score (CENTERED)
+    st.markdown("<div class='center-div'>", unsafe_allow_html=True) 
     st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # AI Assessment (white text, simplified text)
+    # AI Assessment (uses st.info, dynamically colored)
     st.subheader("AI Fundamental Assessment")
     ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
     st.info(ai_text_content)
-    st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+    st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 5. FUNDAMENTAL CATEGORIES CHART (Section #0E1117)
+# 5. FUNDAMENTAL CATEGORIES CHART (Uses section-primary)
 # -------------------------
-st.markdown("<div class='section-black'>", unsafe_allow_html=True)
+st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
 st.header("Fundamental Categories Chart") 
 
 viz_df = df_scored.copy() 
@@ -528,29 +524,27 @@ if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Points by Category Over Time (Daily Aggregate of Events)")
     
-    # Plotly Fix: Use f-string for variable insertion
+    # Plotly dynamic styling
     fig.update_layout(
-        plot_bgcolor=f"{BG_BLACK}", 
-        paper_bgcolor=f"{BG_BLACK}",
-        font_color=f"{TEXT_CREAM}",
-        title_font_color=f"{TEXT_CREAM}",
-        # Darker color for lines and axes
-        xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-        yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK)
+        plot_bgcolor=f"{BG_PRIMARY}", 
+        paper_bgcolor=f"{BG_PRIMARY}",
+        font_color=f"{TEXT_PRIMARY}",
+        title_font_color=f"{TEXT_PRIMARY}",
+        xaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+        yaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE)
     )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Not enough data for the chart.")
-st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 5.5 USD SEASONALITY CHARTS (Section #0E1117)
+# 5.5 USD SEASONALITY CHARTS (Uses section-primary, with expander)
 # -------------------------
-# IMPLEMENTING st.expander (rollout) for this section
 with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
-    st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-    st.header("U.S. Dollar Index Seasonality Charts") # Changed to plural
+    st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
+    st.header("U.S. Dollar Index Seasonality Charts") 
 
     # --- 5.5.1 Multi-Line Chart (15Y, 10Y, 5Y) ---
     st.subheader("Average Monthly Return: 15Y vs. 10Y vs. 5Y")
@@ -560,7 +554,6 @@ with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
         df_seasonality_lines = generate_dxy_seasonality_data()
         st.info(f"Note: Could not load or process seasonality file '{DXY_LINES_PATH}'. Displaying MOCK seasonality data.")
         
-    # Melt DataFrame for plotting multiple lines with Plotly
     df_melted = df_seasonality_lines.melt(
         id_vars=['Month', 'Month_Index'], 
         value_vars=['Return_15Y', 'Return_10Y', 'Return_5Y'],
@@ -571,25 +564,23 @@ with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
     fig_season_lines = px.line(df_melted, 
                         x="Month", 
                         y="Average Return (%)",
-                        color="Period", # Color differentiates the periods
+                        color="Period", 
                         title="Average Monthly Return by Period",
                         labels={"Average Return (%)": "Average Return (%)", "Month": "Month"},
                         markers=True, line_shape='linear',
-                        category_orders={"Month": df_seasonality_lines['Month'].tolist()}) # Ensure correct month order
+                        category_orders={"Month": df_seasonality_lines['Month'].tolist()}) 
 
+    fig_season_lines.add_hline(y=0, line_dash="dash", line_color=BORDER_LINE)
 
-    # Add zero line for clarity
-    fig_season_lines.add_hline(y=0, line_dash="dash", line_color=BORDER_DARK)
-
+    # Plotly dynamic styling
     fig_season_lines.update_layout(
-        plot_bgcolor=f"{BG_BLACK}", 
-        paper_bgcolor=f"{BG_BLACK}",
-        font_color=f"{TEXT_CREAM}",
-        title_font_color=f"{TEXT_CREAM}",
-        # Darker color for lines and axes
-        xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-        yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-        legend_title_text='Period' # Correct legend title
+        plot_bgcolor=f"{BG_PRIMARY}", 
+        paper_bgcolor=f"{BG_PRIMARY}",
+        font_color=f"{TEXT_PRIMARY}",
+        title_font_color=f"{TEXT_PRIMARY}",
+        xaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+        yaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+        legend_title_text='Period' 
     )
     st.plotly_chart(fig_season_lines, use_container_width=True)
     
@@ -600,44 +591,41 @@ with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
     if df_seasonality_heatmap is None:
         st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or invalid. Heatmap chart is not available.")
     else:
-        # Reorder months for display (using Month_Index for sorting internally)
         month_order = df_seasonality_lines['Month'].tolist()
-        
-        # Determine color range based on data for better contrast
-        max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 # Add 5% buffer
+        max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
         
         fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
                                      x="Month", 
                                      y="Year", 
                                      z="Return",
                                      category_orders={"Month": month_order, "Year": sorted(df_seasonality_heatmap['Year'].unique(), reverse=True)},
-                                     color_continuous_scale='RdYlGn', # Red for negative, Green for positive
+                                     color_continuous_scale='RdYlGn', 
                                      range_color=[-max_abs, max_abs],
                                      title="Monthly Return Heatmap by Year")
 
+        # Plotly dynamic styling
         fig_heatmap.update_layout(
-            plot_bgcolor=f"{BG_BLACK}", 
-            paper_bgcolor=f"{BG_BLACK}",
-            font_color=f"{TEXT_CREAM}",
-            title_font_color=f"{TEXT_CREAM}",
-            # Darker color for axes
-            xaxis=dict(tickangle=45, gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-            yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-            coloraxis_colorbar=dict(title="Return (%)", tickfont=dict(color=TEXT_CREAM))
+            plot_bgcolor=f"{BG_PRIMARY}", 
+            paper_bgcolor=f"{BG_PRIMARY}",
+            font_color=f"{TEXT_PRIMARY}",
+            title_font_color=f"{TEXT_PRIMARY}",
+            xaxis=dict(tickangle=45, gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+            yaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+            coloraxis_colorbar=dict(title="Return (%)", tickfont=dict(color=TEXT_PRIMARY))
         )
         st.plotly_chart(fig_heatmap, use_container_width=True)
 
-    st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+    st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
     
 # -------------------------
-# 6. EXPORT / DOWNLOAD (Section #0E1117)
+# 6. EXPORT / DOWNLOAD (Uses section-primary)
 # -------------------------
-st.markdown("<div class='section-black'>", unsafe_allow_html=True)
+st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
 st.header("Export / Download")
 
 csv_all = df_high.sort_values("DateParsed", ascending=False)[
     ["DateDisplay","Category","Report","Actual","Forecast","Previous","Points"]
 ].rename(columns={"DateDisplay":"Date"})
 st.download_button("Download Events CSV", csv_all.to_csv(index=False).encode("utf-8"), "usd_macro_events_manual.csv", "text/csv")
-st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
