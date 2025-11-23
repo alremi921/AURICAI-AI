@@ -1,9 +1,5 @@
 Date,Report,Category,Actual,Forecast,Previous
-2025-11-22 14:30,Unemployment Rate,Labor Market,4.0,3.9,4.1
-2025-11-15 14:30,Core CPI YoY,Inflation,3.4,3.5,3.3
-2025-11-01 20:00,FOMC Interest Rate Decision,Interest Rates,5.50,5.50,5.25
-2025-10-31 14:30,GDP Growth Rate (QoQ),Economic Activity,2.8,2.5,3.1
-2025-10-06 14:30,Nonfarm Payrolls,Labor Market,250K,200K,180K
-2025-09-12 14:30,Retail Sales MoM,Economic Activity,0.5,0.2,0.8
-2025-09-01 20:00,FOMC Press Conference,Interest Rates,,-1,
-2025-08-15 14:30,Consumer Price Index (CPI),Inflation,3.7,3.6,3.8
+2025-11-18,Unemployment Calims,Labor Market,220k,227k,228k
+2025-11-20,Nonfarm Employment Change,Labor Market,119k,53k,-4k
+2025-11-20,Average Hourly Earnings m/m,Labor Market,0.2%,0.3%,0.3%
+2025-11-18,Unemployment rate,Labor Market,4.4%,4.3%,4.3%
