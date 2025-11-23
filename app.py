@@ -159,16 +159,14 @@ def load_seasonality_heatmap_data():
     if not os.path.exists(DXY_HEATMAP_PATH):
         return pd.DataFrame()
     try:
-        # Přečteme soubor s defaultním oddělovačem čárky
-        df = pd.read_csv(DXY_HEATMAP_PATH, sep=',') 
+        # ZMĚNA ZDE: Přidání decimal='.' zajišťuje správné čtení desetinných teček
+        df = pd.read_csv(DXY_HEATMAP_PATH, sep=',', decimal='.') 
         
         expected_cols = ['Year', 'Month', 'Return']
         if not all(col in df.columns for col in expected_cols):
             return pd.DataFrame()
             
-        # OPRAVA CHYBY: Manuálně parsujeme sloupec 'Return' (nahradíme čárky tečkami)
-        df['Return'] = df['Return'].astype(str).str.replace(',', '.', regex=False)
-        # EXPLICITNÍ TYPOVÁ KONVERZE A ZAMĚŘENÍ NA CHYBĚJÍCÍ DATA
+        # Zjednodušení, protože decimal='.' už zajistil správné parsování čísel.
         df['Return'] = pd.to_numeric(df['Return'], errors='coerce', downcast='float')
         df = df[df['Return'].notna()] # Odstraníme řádky, kde se parsování nepodařilo
         
