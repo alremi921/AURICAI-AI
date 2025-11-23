@@ -207,20 +207,7 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     width: 100%; 
 }}
 
-/* Styling for st.expander - ensure it uses the primary theme */
-.stExpander {{
-    border: 1px solid {BORDER_LINE};
-    border-radius: 5px;
-    background-color: {BG_PRIMARY};
-    color: {TEXT_PRIMARY};
-    padding: 10px;
-    margin-bottom: 20px;
-}}
-/* Content inside expander */
-.stExpander > div > div {{
-    padding-top: 20px;
-}}
-
+/* Removed stExpander styling as expanders are now removed */
 
 </style>
 """, unsafe_allow_html=True)
@@ -269,7 +256,7 @@ def load_seasonality_lines_data():
         
         expected_cols = ['Month', 'Return_15Y', 'Return_10Y', 'Return_5Y']
         if not all(col in df.columns for col in expected_cols):
-            st.warning(f"Warning: Seasonality lines file '{DXY_LINES_PATH}' missing expected columns. Using mock data for lines.")
+            # Instead of error, return None to trigger mock data / skip chart
             return None
         
         month_to_index = {
@@ -279,13 +266,11 @@ def load_seasonality_lines_data():
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
-             st.warning(f"Warning: Seasonality lines file '{DXY_LINES_PATH}' contains invalid month names. Using mock data for lines.")
              return None
              
         df = df.sort_values('Month_Index').reset_index(drop=True)
         return df
-    except Exception as e:
-        st.warning(f"Warning: Could not process seasonality lines file. Error: {e}. Using mock data for lines.")
+    except Exception:
         return None
         
 # Loads heatmap seasonality data
@@ -298,7 +283,6 @@ def load_seasonality_heatmap_data():
         
         expected_cols = ['Year', 'Month', 'Return']
         if not all(col in df.columns for col in expected_cols):
-            st.warning(f"Warning: Seasonality heatmap file '{DXY_HEATMAP_PATH}' missing expected columns. Not displaying heatmap.")
             return None
             
         df['Year'] = df['Year'].astype(str)
@@ -310,13 +294,11 @@ def load_seasonality_heatmap_data():
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
-             st.warning(f"Warning: Seasonality heatmap file '{DXY_HEATMAP_PATH}' contains invalid month names. Not displaying heatmap.")
              return None
              
         df = df.sort_values(['Year', 'Month_Index'], ascending=[False, True]).reset_index(drop=True)
         return df
-    except Exception as e:
-        st.warning(f"Warning: Could not process seasonality heatmap file. Error: {e}. Not displaying heatmap.")
+    except Exception:
         return None
 
 def score_event(row):
@@ -356,24 +338,11 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     
     return summary
 
-# Defines Pandas Styler dynamically based on theme
-dynamic_styler = [
-    {'selector': 'th, td',
-     'props': [('background-color', TABLE_BG), 
-               ('color', TEXT_PRIMARY),
-               ('border', f'1px solid {BORDER_LINE}'), 
-               ('border-radius', '0')]},
-    {'selector': 'table',
-     'props': [('border-collapse', 'collapse')]}
-]
-
-# --- HELPER FUNCTION FOR SEASONALITY (DXY MOCK DATA) ---
 def generate_dxy_seasonality_data():
     # Mock data for DXY lines (used if CSV file is missing)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    # Using the calculated mock averages from the previous step
     mock_returns_15Y = [0.30, 0.20, 0.05, -0.30, 0.15, -0.05, -0.20, 0.05, 0.50, 0.35, 0.25, -0.50]
     mock_returns_10Y = [0.40, 0.35, 0.10, -0.45, 0.20, -0.15, -0.30, 0.10, 0.70, 0.45, 0.30, -0.60]
     mock_returns_5Y = [0.55, 0.40, 0.15, -0.60, 0.30, -0.25, -0.40, 0.15, 0.90, 0.50, 0.25, -0.80]
@@ -392,8 +361,17 @@ def generate_dxy_seasonality_data():
     }
     df['Month_Index'] = df['Month'].map(month_to_index)
     return df.set_index('Month_Index').sort_values('Month_Index')
-# -----------------------------------------------------
 
+# Defines Pandas Styler dynamically based on theme
+dynamic_styler = [
+    {'selector': 'th, td',
+     'props': [('background-color', TABLE_BG), 
+               ('color', TEXT_PRIMARY),
+               ('border', f'1px solid {BORDER_LINE}'), 
+               ('border-radius', '0')]},
+    {'selector': 'table',
+     'props': [('border-collapse', 'collapse')]}
+]
 
 # -------------------------
 # BUILD DASHBOARD
@@ -445,7 +423,7 @@ for i, cat in enumerate(unique_categories):
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
     )
     
-    # Use dynamic styler and dynamic-table class
+    # Use dynamic styler and dynamic-table class (Hiding index row is crucial here)
     styled_df = display_df.style.set_table_styles(dynamic_styler).hide(axis="index")
 
     if i % 2 == 0:
@@ -464,50 +442,49 @@ st.markdown("</div>", unsafe_allow_html=True) # End SECONDARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 4. FUNDAMENTAL EVALUATION AND AI ANALYSIS (Uses section-primary, with expander)
+# 4. FUNDAMENTAL EVALUATION AND AI ANALYSIS (Uses section-primary)
 # -------------------------
-with st.expander("Fundamental Evaluation and AI Assessment", expanded=True):
-    st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
-    st.header("Fundamental Evaluation") 
+st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
+st.header("Fundamental Evaluation") 
 
-    summary_rows = []
-    total_combined_score = 0
+summary_rows = []
+total_combined_score = 0
 
-    for cat, df_cat in category_frames.items():
-        total, label = evaluate_category(df_cat)
-        total_combined_score += total
-        summary_rows.append({
-            "Category": cat,
-            "Events Count": int(len(df_cat)),
-            "Total Points": total,
-            "Evaluation": label
-        })
+for cat, df_cat in category_frames.items():
+    total, label = evaluate_category(df_cat)
+    total_combined_score += total
+    summary_rows.append({
+        "Category": cat,
+        "Events Count": int(len(df_cat)),
+        "Total Points": total,
+        "Evaluation": label
+    })
 
-    summary_df = pd.DataFrame(summary_rows)
-    final_score = total_combined_score
+summary_df = pd.DataFrame(summary_rows)
+final_score = total_combined_score
 
-    if final_score >= 2: final_label = "BULLISH"
-    elif final_score <= -2: final_label = "BEARISH"
-    else: final_label = "NEUTRAL"
+if final_score >= 2: final_label = "BULLISH"
+elif final_score <= -2: final_label = "BEARISH"
+else: final_label = "NEUTRAL"
 
-    # Use dynamic styler
-    styled_summary = summary_df.style.set_table_styles(dynamic_styler).hide(axis="index").format({"Total Points":"{:+d}"})
+# Use dynamic styler
+styled_summary = summary_df.style.set_table_styles(dynamic_styler).hide(axis="index").format({"Total Points":"{:+d}"})
 
-    # Display summary table
-    st.markdown(f'<div class="dynamic-table">', unsafe_allow_html=True)
-    st.table(styled_summary) 
-    st.markdown('</div>', unsafe_allow_html=True)
+# Display summary table
+st.markdown(f'<div class="dynamic-table">', unsafe_allow_html=True)
+st.table(styled_summary) 
+st.markdown('</div>', unsafe_allow_html=True)
 
-    # Highlight Total Score (CENTERED)
-    st.markdown("<div class='center-div'>", unsafe_allow_html=True) 
-    st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+# Highlight Total Score (CENTERED)
+st.markdown("<div class='center-div'>", unsafe_allow_html=True) 
+st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
-    # AI Assessment (uses st.info, dynamically colored)
-    st.subheader("AI Fundamental Assessment")
-    ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
-    st.info(ai_text_content)
-    st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
+# AI Assessment (uses st.info, dynamically colored)
+st.subheader("AI Fundamental Assessment")
+ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
+st.info(ai_text_content)
+st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
@@ -540,20 +517,22 @@ st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 5.5 USD SEASONALITY CHARTS (Uses section-primary, with expander)
+# 5.5 USD SEASONALITY CHARTS (Uses section-primary)
 # -------------------------
-with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
-    st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
-    st.header("U.S. Dollar Index Seasonality Charts") 
+st.markdown("<div class='section-primary'>", unsafe_allow_html=True)
+st.header("U.S. Dollar Index Seasonality Charts") 
 
-    # --- 5.5.1 Multi-Line Chart (15Y, 10Y, 5Y) ---
-    st.subheader("Average Monthly Return: 15Y vs. 10Y vs. 5Y")
-    df_seasonality_lines = load_seasonality_lines_data()
+# --- 5.5.1 Multi-Line Chart (15Y, 10Y, 5Y) ---
+st.subheader("Average Monthly Return: 15Y vs. 10Y vs. 5Y")
+df_seasonality_lines = load_seasonality_lines_data()
+
+if df_seasonality_lines is None:
+    df_seasonality_lines = generate_dxy_seasonality_data()
+    st.info(f"Note: Could not load or process seasonality file '{DXY_LINES_PATH}'. Displaying MOCK seasonality data.")
     
-    if df_seasonality_lines is None:
-        df_seasonality_lines = generate_dxy_seasonality_data()
-        st.info(f"Note: Could not load or process seasonality file '{DXY_LINES_PATH}'. Displaying MOCK seasonality data.")
-        
+# --- Check if we have valid data (even mock data) to prevent KeyError ---
+if df_seasonality_lines is not None and not df_seasonality_lines.empty:
+    
     df_melted = df_seasonality_lines.melt(
         id_vars=['Month', 'Month_Index'], 
         value_vars=['Return_15Y', 'Return_10Y', 'Return_5Y'],
@@ -583,39 +562,44 @@ with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
         legend_title_text='Period' 
     )
     st.plotly_chart(fig_season_lines, use_container_width=True)
-    
-    # --- 5.5.2 Heatmap Chart ---
-    st.subheader("USDX Monthly Return Heatmap (By Year)")
-    df_seasonality_heatmap = load_seasonality_heatmap_data()
-    
-    if df_seasonality_heatmap is None:
-        st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or invalid. Heatmap chart is not available.")
-    else:
-        month_order = df_seasonality_lines['Month'].tolist()
-        max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
-        
-        fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
-                                     x="Month", 
-                                     y="Year", 
-                                     z="Return",
-                                     category_orders={"Month": month_order, "Year": sorted(df_seasonality_heatmap['Year'].unique(), reverse=True)},
-                                     color_continuous_scale='RdYlGn', 
-                                     range_color=[-max_abs, max_abs],
-                                     title="Monthly Return Heatmap by Year")
+else:
+    st.info("Seasonality line chart data is unavailable.")
 
-        # Plotly dynamic styling
-        fig_heatmap.update_layout(
-            plot_bgcolor=f"{BG_PRIMARY}", 
-            paper_bgcolor=f"{BG_PRIMARY}",
-            font_color=f"{TEXT_PRIMARY}",
-            title_font_color=f"{TEXT_PRIMARY}",
-            xaxis=dict(tickangle=45, gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
-            yaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
-            coloraxis_colorbar=dict(title="Return (%)", tickfont=dict(color=TEXT_PRIMARY))
-        )
-        st.plotly_chart(fig_heatmap, use_container_width=True)
 
-    st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
+# --- 5.5.2 Heatmap Chart ---
+st.subheader("USDX Monthly Return Heatmap (By Year)")
+df_seasonality_heatmap = load_seasonality_heatmap_data()
+
+if df_seasonality_heatmap is None or df_seasonality_heatmap.empty:
+    st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or invalid. Heatmap chart is not available.")
+else:
+    month_order = df_seasonality_lines['Month'].tolist() if df_seasonality_lines is not None else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    
+    # Calculate max_abs only if data is present
+    max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
+    
+    fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
+                                 x="Month", 
+                                 y="Year", 
+                                 z="Return",
+                                 category_orders={"Month": month_order, "Year": sorted(df_seasonality_heatmap['Year'].unique(), reverse=True)},
+                                 color_continuous_scale='RdYlGn', 
+                                 range_color=[-max_abs, max_abs],
+                                 title="Monthly Return Heatmap by Year")
+
+    # Plotly dynamic styling
+    fig_heatmap.update_layout(
+        plot_bgcolor=f"{BG_PRIMARY}", 
+        paper_bgcolor=f"{BG_PRIMARY}",
+        font_color=f"{TEXT_PRIMARY}",
+        title_font_color=f"{TEXT_PRIMARY}",
+        xaxis=dict(tickangle=45, gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+        yaxis=dict(gridcolor=BORDER_LINE, linecolor=BORDER_LINE),
+        coloraxis_colorbar=dict(title="Return (%)", tickfont=dict(color=TEXT_PRIMARY))
+    )
+    st.plotly_chart(fig_heatmap, use_container_width=True)
+
+st.markdown("</div>", unsafe_allow_html=True) # End PRIMARY section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
     
 # -------------------------
