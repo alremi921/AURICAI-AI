@@ -8,21 +8,12 @@ import os
 # -------------------------
 # GLOBAL CONFIGURATION
 # -------------------------
-# Nastavení motivu na základě OS (System Preference)
+# Streamlit se automaticky přepne na Dark/Light motiv podle systémového nastavení
 st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide", initial_sidebar_state="collapsed") 
 
-# Streamlit automaticky aplikuje Dark/Light motiv podle systémového nastavení, 
-# pokud není v konfiguračním souboru nastaveno jinak.
-
-# Definováni barev pro Plotly a CSS třídy (pro dynamické použití s Theme Preference)
-# Používáme barvy kompatibilní s výchozími Dark/Light módy Streamlit,
-# ale ponecháme flexibilitu pro Plotly.
-
-BG_PRIMARY_DARK = '#0E1117'
-TEXT_PRIMARY_DARK = '#FFFFFF'
-BG_SECONDARY_LIGHT = '#F0F2F6' # Default light background
-TEXT_SECONDARY_DARK = '#0E1117'
-BORDER_DARK = '#31333F' # Pro linky a mřížky v grafech
+# Definováni barev pro Plotly (pro čitelnost v obou módech)
+# BORDER_DARK používáme jako barvu mřížky, která je viditelná na světlém i tmavém pozadí
+BORDER_DARK = '#31333F' 
 
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
 DXY_LINES_PATH = "dxy_linechart_history.csv.txt" 
@@ -39,16 +30,12 @@ CATEGORY_KEYWORDS = {
 
 
 # -------------------------
-# CORE CSS FOR STABILITY AND DESIGN (Přizpůsobeno výchozímu stylu Streamlit)
+# CORE CSS FOR STABILITY AND DESIGN (Základní styling)
 # -------------------------
-# Odstraníme custom styling pro tabulky a ponecháme jen základní typografii
-
 st.markdown(f"""
 <style>
 /* 1. Import Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Montserrat:wght@300;400;700&display=swap');
-
-/* Ponecháváme globální nastavení, ale Streamlit již sám řeší pozadí/text */
 
 /* 3. Styling headers (Montserrat Light, Uppercase) */
 h1, h2, h3, h4, .small-title {{
@@ -81,8 +68,6 @@ p, div, label {{
     text-align: center; 
 }}
 
-/* Odstraněny sekce section-primary/secondary a custom styling tabulek */
-
 /* Centering Total Score (pouze text styling) */
 .score-line-container {{
     border: none; 
@@ -97,8 +82,8 @@ p, div, label {{
     display: block; 
 }}
 
-/* Centering of st.table (pro původní vzhled tabulek) */
-div[data-testid="stTable"] {{
+/* Centering of st.dataframe (pro původní vzhled tabulek) */
+div[data-testid="stDataFrame"] {{
     display: flex;
     justify-content: center;
     width: 100%; 
@@ -123,7 +108,6 @@ def clean_num(x):
 
 @st.cache_data
 def load_events_from_csv():
-    # ... (stejná implementace) ...
     if not os.path.exists(CSV_FILE_PATH):
         st.error(f"Error: Data file '{CSV_FILE_PATH}' not found. Please create it according to the template.")
         return pd.DataFrame()
@@ -147,7 +131,7 @@ def load_events_from_csv():
 @st.cache_data
 def load_seasonality_lines_data():
     if not os.path.exists(DXY_LINES_PATH):
-        return pd.DataFrame() # Vrátit prázdný DF místo None
+        return pd.DataFrame() 
     try:
         df = pd.read_csv(DXY_LINES_PATH, decimal='.', sep=',') 
         
@@ -169,22 +153,23 @@ def load_seasonality_lines_data():
     except Exception:
         return pd.DataFrame()
         
-# Loads heatmap seasonality data
+# Loads heatmap seasonality data (S ROBUSTNÍ OPRAVOU DECIMAL SEPARATORU)
 @st.cache_data
 def load_seasonality_heatmap_data():
     if not os.path.exists(DXY_HEATMAP_PATH):
-        return None
+        return pd.DataFrame()
     try:
-        df = pd.read_csv(DXY_HEATMAP_PATH, decimal='.', sep=',') 
+        # Použijeme sep=',' pro načtení CSV
+        df = pd.read_csv(DXY_HEATMAP_PATH, sep=',') 
         
         expected_cols = ['Year', 'Month', 'Return']
         if not all(col in df.columns for col in expected_cols):
-            return None
+            return pd.DataFrame()
             
-        # OPRAVA: Manuálně parsujeme sloupec 'Return', abychom nahradili čárky tečkami
+        # OPRAVA CHYBY: Manuálně parsujeme sloupec 'Return' (nahradíme čárky tečkami)
         df['Return'] = df['Return'].astype(str).str.replace(',', '.', regex=False)
         df['Return'] = pd.to_numeric(df['Return'], errors='coerce')
-        df = df[df['Return'].notna()] # Odstraníme řádky, kde se parsování nepodařilo
+        df = df[df['Return'].notna()] 
         
         df['Year'] = df['Year'].astype(str)
         
@@ -195,12 +180,12 @@ def load_seasonality_heatmap_data():
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
-             return None
+             return pd.DataFrame()
              
         df = df.sort_values(['Year', 'Month_Index'], ascending=[False, True]).reset_index(drop=True)
         return df
     except Exception:
-        return None
+        return pd.DataFrame()
 
 def score_event(row):
     a = clean_num(row.get("Actual"))
@@ -240,11 +225,10 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     return summary
 
 def generate_dxy_seasonality_data():
-    # Mock data for DXY lines (used if CSV file is missing or invalid)
+    # Mock data pro Line Chart (použité při selhání načtení z CSV)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    # Mock data based on the provided values in dxy_linechart_history.csv.txt [cite: 1]
     mock_returns_15Y = [0.16, 0.52, 0.03, -0.65, 1.19, -0.33, -0.35, 0.10, 0.62, 0.40, 0.67, -0.56]
     mock_returns_10Y = [0.35, 0.55, 0.05, -0.60, 0.90, -0.30, -0.50, 0.10, 0.70, 0.45, 0.80, -0.60]
     mock_returns_5Y = [0.15, 0.40, 0.20, -0.45, 1.20, -0.10, -0.35, 0.00, 0.55, 0.30, 0.65, -0.40]
@@ -310,10 +294,10 @@ for i, cat in enumerate(unique_categories):
     category_frames[cat] = cat_df_scored
 
     cat_df_display = cat_df_display.sort_values("DateParsed", ascending=False)
-    # Původní zobrazení tabulky bez Pandas styleru
+    # Původní zobrazení tabulky
     display_df = cat_df_display[["DateDisplay", "Report", "Actual", "Forecast", "Previous", "Points"]].rename(
         columns={"DateDisplay":"Date","Report":"Report","Actual":"Actual","Forecast":"Forecast","Previous":"Previous","Points":"Points"}
-    ).reset_index(drop=True) # Odstranění indexu
+    ).reset_index(drop=True) 
 
     if i % 2 == 0:
         with cols[0]:
@@ -351,7 +335,7 @@ if final_score >= 2: final_label = "BULLISH"
 elif final_score <= -2: final_label = "BEARISH"
 else: final_label = "NEUTRAL"
 
-# Původní zobrazení tabulky bez Pandas styleru
+# Původní zobrazení tabulky
 st.dataframe(summary_df.reset_index(drop=True).rename(columns={"Total Points":"Total Points"}), use_container_width=True)
 
 
@@ -379,11 +363,10 @@ if not viz_agg.empty:
     fig = px.line(viz_agg, x="DateSimple", y="Points", color="Category", markers=True,
                   title="Points by Category Over Time (Daily Aggregate of Events)")
     
-    # Plotly dynamický styling (pro čitelnost v obou módech)
+    # Plotly dynamický styling (Transparentní pro system preference)
     fig.update_layout(
-        plot_bgcolor="rgba(0,0,0,0)", # Transparentní pozadí
-        paper_bgcolor="rgba(0,0,0,0)", # Transparentní papír
-        # Ostatní barvy ponecháme dynamicky
+        plot_bgcolor="rgba(0,0,0,0)", 
+        paper_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
         yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK)
     )
@@ -445,12 +428,11 @@ st.subheader("USDX Monthly Return Heatmap (By Year)")
 df_seasonality_heatmap = load_seasonality_heatmap_data()
 
 # --- Vykreslení Heatmap Chart ---
-if df_seasonality_heatmap is None or df_seasonality_heatmap.empty:
+if df_seasonality_heatmap.empty:
     st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or contains invalid data. Heatmap chart is not available.")
 else:
     month_order = df_seasonality_lines['Month'].tolist() if not df_seasonality_lines.empty else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    # Data jsou ošetřena proti chybě desetinných čísel ve funkci load_seasonality_heatmap_data()
     max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 
     
     fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
