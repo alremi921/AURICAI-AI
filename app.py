@@ -444,8 +444,8 @@ else:
     # Definice ostře přecházející barevné škály: Červená pro < 0, Zelená pro >= 0
     custom_two_color_scale = [
         [0.0, 'red'],
-        [P0 - 1e-9, 'red'], # Vše pod nulou je červené
-        [P0 + 1e-9, 'green'], # Vše nad nulou je zelené
+        [P0 - 1e-9, 'red'], 
+        [P0 + 1e-9, 'green'], 
         [1.0, 'green']
     ]
 
@@ -455,13 +455,13 @@ else:
     # Seznam unikátních let pro explicitní řazení Y-osy
     year_order = sorted(df_seasonality_heatmap['Year'].unique(), key=lambda x: int(x), reverse=True)
     
+    # NOVÉ VOLÁNÍ PX.DENSITY_HEATMAP: Text je předáván jako název sloupce (string)
+    # Tím se řeší TypeError.
     fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
                                  x="Month", 
                                  y="Year", 
                                  z="Return", # Používá se pro určení barvy
-                                 text_auto=False, # Vypneme automatický text
-                                 # OPRAVA ZDE: Předáváme název sloupce jako řetězec, ne Pandas Series.
-                                 text='Return_Text', # Nastavíme vlastní text
+                                 text='Return_Text', # OPRAVENO: Název sloupce jako string
                                  category_orders={"Month": month_order, "Year": year_order},
                                  color_continuous_scale=custom_two_color_scale, # Aplikace dvoubarevné škály
                                  range_color=[min_val, max_val], # Rozsah musí pokrýt celá data
@@ -476,7 +476,12 @@ else:
         coloraxis_colorbar=dict(title="Return (%)", tickvals=[min_val, 0, max_val], ticktext=[f"{min_val:.2f} (Negative)", "0.00", f"{max_val:.2f} (Positive)"]) 
     )
     # Zajištění, že text je viditelný a bez pop-upu
-    fig_heatmap.update_traces(texttemplate='%{text}', hovertemplate=None, selector=dict(type='heatmap'))
+    fig_heatmap.update_traces(
+        texttemplate='%{text}', 
+        hovertemplate=None, 
+        selector=dict(type='heatmap'),
+        textfont=dict(color='black') # Nastavíme barvu textu na černou pro lepší čitelnost na barvě
+    )
 
     st.plotly_chart(fig_heatmap, use_container_width=True)
 
