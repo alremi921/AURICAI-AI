@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import plotly.express as px
+import plotly.graph_objects as go # NOVÝ IMPORT pro go.Heatmap
 import os 
 
 # -------------------------
@@ -423,64 +424,71 @@ else:
     st.info("Seasonality line chart data is unavailable.")
 
 
-# --- 5.5.2 Heatmap Chart ---
+# --- 5.5.2 Heatmap Chart (OPRAVA: POUŽITÍ GO.HEATMAP) ---
 st.subheader("USDX Monthly Return Heatmap (By Year)")
 df_seasonality_heatmap = load_seasonality_heatmap_data()
 
 # --- Vykreslení Heatmap Chart ---
 if df_seasonality_heatmap.empty:
-    st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or contains invalid data. Heatmap chart is not available.")
+    st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or contains invalid data. Heatmap chart je není dostupný.")
 else:
-    month_order = df_seasonality_lines['Month'].tolist() if not df_seasonality_lines.empty else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    # 1. Příprava dat (Pivotování)
+    df_seasonality_heatmap['Return_Text'] = df_seasonality_heatmap['Return'].apply(lambda x: f"{x:+.2f}")
     
-    # 1. Výpočet pro striktně dvoubarevnou stupnici (červená/zelená)
-    min_val = df_seasonality_heatmap['Return'].min()
-    max_val = df_seasonality_heatmap['Return'].max()
+    # Pivotace pro Z (Barva) a Text (Popisky)
+    df_pivot = df_seasonality_heatmap.pivot(index='Year', columns='Month', values='Return')
+    df_text_pivot = df_seasonality_heatmap.pivot(index='Year', columns='Month', values='Return_Text')
+    
+    # Zajištění správného pořadí
+    month_order = df_seasonality_lines['Month'].tolist() if not df_seasonality_lines.empty else ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    year_order = sorted(df_seasonality_heatmap['Year'].unique(), key=lambda x: int(x), reverse=True)
+    
+    df_pivot = df_pivot.reindex(index=year_order, columns=month_order)
+    df_text_pivot = df_text_pivot.reindex(index=year_order, columns=month_order)
+    
+    # 2. Výpočet pro striktně dvoubarevnou stupnici (červená/zelená)
+    # Použijeme pivotované hodnoty pro min/max
+    min_val = np.nanmin(df_pivot.values) if not df_pivot.empty else -1
+    max_val = np.nanmax(df_pivot.values) if not df_pivot.empty else 1
     range_val = max_val - min_val
 
     # Vypočítáme normalizovanou pozici nuly v rozsahu [0, 1]
     P0 = (0 - min_val) / range_val if range_val != 0 else 0.5
     
-    # Definice ostře přecházející barevné škály: Červená pro < 0, Zelená pro >= 0
+    # Definice ostře přecházející barevné škály
     custom_two_color_scale = [
         [0.0, 'red'],
-        [P0 - 1e-9, 'red'], 
-        [P0 + 1e-9, 'green'], 
+        [P0 - 1e-9, 'red'], # Vše pod nulou je červené
+        [P0 + 1e-9, 'green'], # Vše nad nulou je zelené
         [1.0, 'green']
     ]
-
-    # 2. Přidání textového popisku (formátováno na dvě desetinná místa)
-    df_seasonality_heatmap['Return_Text'] = df_seasonality_heatmap['Return'].apply(lambda x: f"{x:+.2f}")
-
-    # Seznam unikátních let pro explicitní řazení Y-osy
-    year_order = sorted(df_seasonality_heatmap['Year'].unique(), key=lambda x: int(x), reverse=True)
     
-    # NOVÉ VOLÁNÍ PX.DENSITY_HEATMAP: Text je předáván jako název sloupce (string)
-    # Tím se řeší TypeError.
-    fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
-                                 x="Month", 
-                                 y="Year", 
-                                 z="Return", # Používá se pro určení barvy
-                                 text='Return_Text', # OPRAVENO: Název sloupce jako string
-                                 category_orders={"Month": month_order, "Year": year_order},
-                                 color_continuous_scale=custom_two_color_scale, # Aplikace dvoubarevné škály
-                                 range_color=[min_val, max_val], # Rozsah musí pokrýt celá data
-                                 title="Monthly Return Heatmap by Year (Red=Negative, Green=Positive)")
+    # 3. Vytvoření go.Heatmap
+    heatmap = go.Heatmap(
+        z=df_pivot.values,
+        x=df_pivot.columns.tolist(), # Měsíce z pivotu
+        y=df_pivot.index.tolist(),   # Roky z pivotu
+        text=df_text_pivot.values, # Text je ve formátu matice
+        texttemplate="%{text}",
+        textfont={"size": 10, "color": "black"},
+        colorscale=custom_two_color_scale,
+        zmin=min_val,
+        zmax=max_val,
+        hoverinfo='text',
+        hovertemplate="Měsíc: %{x}<br>Rok: %{y}<br>Návratnost: %{z:.2f}<extra></extra>"
+    )
 
-    # Plotly dynamic styling
+    fig_heatmap = go.Figure(data=[heatmap])
+
+    # Plotly dynamic styling (Layout)
     fig_heatmap.update_layout(
         plot_bgcolor="rgba(0,0,0,0)", 
         paper_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(tickangle=45, gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-        yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+        xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK, title="Month", tickangle=45),
+        yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK, title="Year"),
+        title="Monthly Return Heatmap by Year (Red=Negative, Green=Positive)",
+        # Nastavení popisků u ColorBaru
         coloraxis_colorbar=dict(title="Return (%)", tickvals=[min_val, 0, max_val], ticktext=[f"{min_val:.2f} (Negative)", "0.00", f"{max_val:.2f} (Positive)"]) 
-    )
-    # Zajištění, že text je viditelný a bez pop-upu
-    fig_heatmap.update_traces(
-        texttemplate='%{text}', 
-        hovertemplate=None, 
-        selector=dict(type='heatmap'),
-        textfont=dict(color='black') # Nastavíme barvu textu na černou pro lepší čitelnost na barvě
     )
 
     st.plotly_chart(fig_heatmap, use_container_width=True)
