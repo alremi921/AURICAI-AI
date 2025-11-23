@@ -17,7 +17,10 @@ TEXT_BLACK = '#0E1117' # Dark text color (for CREAM section)
 BORDER_DARK = '#31333F' 
 
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NEW FILE PATH
+# --- NEW FILE PATHS FOR SEASONALITY ---
+DXY_LINES_PATH = "dxy_seasonality_lines_multi.csv.txt" 
+DXY_HEATMAP_PATH = "dxy_seasonality_heatmap_history.csv.txt" 
+# -------------------------------------
 LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
@@ -177,6 +180,21 @@ div[data-testid="stTable"], div[data-testid="stDataFrame"] {{
     width: 100%; 
 }}
 
+/* Styling for st.expander - ensure it uses the dark theme */
+.stExpander {{
+    border: 1px solid {BORDER_DARK};
+    border-radius: 5px;
+    background-color: {BG_BLACK};
+    color: {TEXT_CREAM};
+    padding: 10px;
+    margin-bottom: 20px;
+}}
+/* Content inside expander */
+.stExpander > div > div {{
+    padding-top: 20px;
+}}
+
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -186,7 +204,9 @@ st.set_page_config(page_title="USD Macro AI Dashboard", layout="wide")
 # DATA CONFIGURATION
 # -------------------------
 CSV_FILE_PATH = "usd_macro_history.csv.txt" 
-DXY_HISTORY_PATH = "dxy_linechart_history.csv.txt" # NEW FILE PATH
+DXY_LINES_PATH = "dxy_seasonality_lines_multi.csv.txt" # NEW FILE PATH 1
+DXY_HEATMAP_PATH = "dxy_seasonality_heatmap_history.csv.txt" # NEW FILE PATH 2
+
 LOOKBACK_DAYS = 90  
 TODAY = datetime.utcnow()
 START_DATE = TODAY - timedelta(days=LOOKBACK_DAYS)
@@ -229,18 +249,18 @@ def load_events_from_csv():
         st.error(f"Could not load or process the CSV file. Error: {e}")
         return pd.DataFrame()
 
-# NEW FUNCTION: Loads actual USDX seasonality data
+# NEW FUNCTION: Loads multi-line seasonality data
 @st.cache_data
-def load_seasonality_data():
-    if not os.path.exists(DXY_HISTORY_PATH):
+def load_seasonality_lines_data():
+    if not os.path.exists(DXY_LINES_PATH):
         return None
     try:
-        # Expects 'Month' column (as month name) and 'Return' (as average return in %)
-        # Data file must use English month names (Jan, Feb, etc.)
-        df = pd.read_csv(DXY_HISTORY_PATH, decimal='.', sep=',') 
+        df = pd.read_csv(DXY_LINES_PATH, decimal='.', sep=',') 
         
-        if 'Month' not in df.columns or 'Return' not in df.columns:
-            # Silence error for cleaner output, return None
+        # Define expected columns for plotting
+        expected_cols = ['Month', 'Return_15Y', 'Return_10Y', 'Return_5Y']
+        if not all(col in df.columns for col in expected_cols):
+            st.warning(f"Warning: Seasonality lines file '{DXY_LINES_PATH}' missing expected columns. Using mock data for lines.")
             return None
         
         # Converts month names to index for correct plotting order
@@ -251,15 +271,48 @@ def load_seasonality_data():
         df['Month_Index'] = df['Month'].map(month_to_index)
         
         if df['Month_Index'].isnull().any():
-             # If mapping fails (e.g., if month names are not in English), return None
+             st.warning(f"Warning: Seasonality lines file '{DXY_LINES_PATH}' contains invalid month names. Using mock data for lines.")
              return None
              
         df = df.sort_values('Month_Index').reset_index(drop=True)
         return df
     except Exception as e:
-        # Silent error to show mock chart
+        st.warning(f"Warning: Could not process seasonality lines file. Error: {e}. Using mock data for lines.")
         return None
-
+        
+# NEW FUNCTION: Loads heatmap seasonality data
+@st.cache_data
+def load_seasonality_heatmap_data():
+    if not os.path.exists(DXY_HEATMAP_PATH):
+        return None
+    try:
+        df = pd.read_csv(DXY_HEATMAP_PATH, decimal='.', sep=',') 
+        
+        # Define expected columns for plotting
+        expected_cols = ['Year', 'Month', 'Return']
+        if not all(col in df.columns for col in expected_cols):
+            st.warning(f"Warning: Seasonality heatmap file '{DXY_HEATMAP_PATH}' missing expected columns. Not displaying heatmap.")
+            return None
+            
+        df['Year'] = df['Year'].astype(str) # Ensure year is treated as discrete category
+        
+        # Check for month consistency
+        month_to_index = {
+            "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, 
+            "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
+        }
+        df['Month_Index'] = df['Month'].map(month_to_index)
+        
+        if df['Month_Index'].isnull().any():
+             st.warning(f"Warning: Seasonality heatmap file '{DXY_HEATMAP_PATH}' contains invalid month names. Not displaying heatmap.")
+             return None
+             
+        # Sort by year (descending for heatmap visual appeal) and then month
+        df = df.sort_values(['Year', 'Month_Index'], ascending=[False, True]).reset_index(drop=True)
+        return df
+    except Exception as e:
+        st.warning(f"Warning: Could not process seasonality heatmap file. Error: {e}. Not displaying heatmap.")
+        return None
 
 def score_event(row):
     a = clean_num(row.get("Actual"))
@@ -302,22 +355,22 @@ def generate_ai_summary(summary_df, final_score, overall_label):
     
     return summary
 
-# --- FUNCTION FOR DATAFRAME STYLING (NO COLOR CODING) ---
-def highlight_points_and_style_text(val):
-    return ""
-
 # --- HELPER FUNCTION FOR SEASONALITY (DXY MOCK DATA) ---
 def generate_dxy_seasonality_data():
     # Simulated data of the average monthly return of the USD Index ($DXY)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     # Mock data for DXY (Strong Q1/Q4, Weak Q2/Q3)
-    mock_returns = [0.8, 0.4, 0.6, -0.2, -0.4, -0.8, 
-                    -0.6, -0.3, 0.2, 0.5, 0.9, 0.7]
+    mock_returns_15Y = [0.2, 0.5, 0.1, -0.5, 1.0, -0.2, -0.4, 0.05, 0.6, 0.35, 0.7, -0.5]
+    mock_returns_10Y = [0.3, 0.6, 0.0, -0.6, 0.9, -0.3, -0.5, 0.1, 0.7, 0.45, 0.8, -0.6]
+    mock_returns_5Y = [0.1, 0.4, 0.2, -0.4, 1.2, -0.1, -0.3, 0.0, 0.55, 0.3, 0.65, -0.4]
+
     
     df = pd.DataFrame({
         "Month": months,
-        "Return": mock_returns
+        "Return_15Y": mock_returns_15Y,
+        "Return_10Y": mock_returns_10Y,
+        "Return_5Y": mock_returns_5Y
     })
     
     # Adding index for correct plotting order
@@ -416,54 +469,56 @@ st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spac
 # -------------------------
 # 4. FUNDAMENTAL EVALUATION AND AI ANALYSIS (Section #0E1117)
 # -------------------------
-st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.header("Fundamental Evaluation") 
+# IMPLEMENTING st.expander (rollout) for this section
+with st.expander("Fundamental Evaluation and AI Assessment", expanded=True):
+    st.markdown("<div class='section-black'>", unsafe_allow_html=True)
+    st.header("Fundamental Evaluation") 
 
-summary_rows = []
-total_combined_score = 0
+    summary_rows = []
+    total_combined_score = 0
 
-for cat, df_cat in category_frames.items():
-    total, label = evaluate_category(df_cat)
-    total_combined_score += total
-    summary_rows.append({
-        "Category": cat,
-        "Events Count": int(len(df_cat)),
-        "Total Points": total,
-        "Evaluation": label
-    })
+    for cat, df_cat in category_frames.items():
+        total, label = evaluate_category(df_cat)
+        total_combined_score += total
+        summary_rows.append({
+            "Category": cat,
+            "Events Count": int(len(df_cat)),
+            "Total Points": total,
+            "Evaluation": label
+        })
 
-summary_df = pd.DataFrame(summary_rows)
-final_score = total_combined_score
+    summary_df = pd.DataFrame(summary_rows)
+    final_score = total_combined_score
 
-if final_score >= 2: final_label = "BULLISH"
-elif final_score <= -2: final_label = "BEARISH"
-else: final_label = "NEUTRAL"
+    if final_score >= 2: final_label = "BULLISH"
+    elif final_score <= -2: final_label = "BEARISH"
+    else: final_label = "NEUTRAL"
 
-# *** KEY CHANGE: Use st.table with Pandas Styler (for reliable colors and index hiding) ***
-styled_summary = summary_df.style.set_table_styles(dark_styler).hide(axis="index").format({"Total Points":"{:+d}"})
+    # *** KEY CHANGE: Use st.table with Pandas Styler (for reliable colors and index hiding) ***
+    styled_summary = summary_df.style.set_table_styles(dark_styler).hide(axis="index").format({"Total Points":"{:+d}"})
 
-# Display summary table
-st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
-st.table(styled_summary) 
-st.markdown('</div>', unsafe_allow_html=True)
+    # Display summary table
+    st.markdown(f'<div class="dark-table">', unsafe_allow_html=True)
+    st.table(styled_summary) 
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Highlight Total Score (no border, CENTERED)
-st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTERING PARENT
-st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+    # Highlight Total Score (no border, CENTERED)
+    st.markdown("<div class='center-div'>", unsafe_allow_html=True) # CENTERING PARENT
+    st.markdown(f"<div class='score-line-container'><span class='score-line'>Total Fundamental Score: {final_score:+d} — {final_label}</span></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# AI Assessment (white text, simplified text)
-st.subheader("AI Fundamental Assessment")
-ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
-st.info(ai_text_content)
-st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+    # AI Assessment (white text, simplified text)
+    st.subheader("AI Fundamental Assessment")
+    ai_text_content = generate_ai_summary(summary_df, final_score, final_label)
+    st.info(ai_text_content)
+    st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
 # 5. FUNDAMENTAL CATEGORIES CHART (Section #0E1117)
 # -------------------------
 st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-st.header("Fundamental Categories Chart")
+st.header("Fundamental Categories Chart") 
 
 viz_df = df_scored.copy() 
 viz_df["DateSimple"] = viz_df["DateParsed"].dt.date
@@ -490,50 +545,89 @@ st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
 
 # -------------------------
-# 5.5 USD SEASONALITY CHART
+# 5.5 USD SEASONALITY CHARTS (Section #0E1117)
 # -------------------------
-st.markdown("<div class='section-black'>", unsafe_allow_html=True)
-# Changed name
-st.header("U.S. Dollar Index Seasonality Chart")
+# IMPLEMENTING st.expander (rollout) for this section
+with st.expander("U.S. Dollar Index Seasonality Charts", expanded=False):
+    st.markdown("<div class='section-black'>", unsafe_allow_html=True)
+    st.header("U.S. Dollar Index Seasonality Charts") # Changed to plural
 
-df_seasonality = load_seasonality_data()
-use_mock_data = False
+    # --- 5.5.1 Multi-Line Chart (15Y, 10Y, 5Y) ---
+    st.subheader("Average Monthly Return: 15Y vs. 10Y vs. 5Y")
+    df_seasonality_lines = load_seasonality_lines_data()
+    
+    if df_seasonality_lines is None:
+        df_seasonality_lines = generate_dxy_seasonality_data()
+        st.info(f"Note: Could not load or process seasonality file '{DXY_LINES_PATH}'. Displaying MOCK seasonality data.")
+        
+    # Melt DataFrame for plotting multiple lines with Plotly
+    df_melted = df_seasonality_lines.melt(
+        id_vars=['Month', 'Month_Index'], 
+        value_vars=['Return_15Y', 'Return_10Y', 'Return_5Y'],
+        var_name='Period', 
+        value_name='Average Return (%)'
+    )
+    
+    fig_season_lines = px.line(df_melted, 
+                        x="Month", 
+                        y="Average Return (%)",
+                        color="Period", # Color differentiates the periods
+                        title="Average Monthly Return by Period",
+                        labels={"Average Return (%)": "Average Return (%)", "Month": "Month"},
+                        markers=True, line_shape='linear',
+                        category_orders={"Month": df_seasonality_lines['Month'].tolist()}) # Ensure correct month order
 
-if df_seasonality is None:
-    # If file load fails or is missing, use mock data
-    df_seasonality = generate_dxy_seasonality_data()
-    use_mock_data = True
-    st.info(f"Note: Could not load or process seasonality file. Displaying MOCK seasonality data. Please ensure '{DXY_HISTORY_PATH}' is correctly formatted (Month,Return) and contains English month names if file is used.")
 
+    # Add zero line for clarity
+    fig_season_lines.add_hline(y=0, line_dash="dash", line_color=BORDER_DARK)
 
-y_column = "Return"
+    fig_season_lines.update_layout(
+        plot_bgcolor=f"{BG_BLACK}", 
+        paper_bgcolor=f"{BG_BLACK}",
+        font_color=f"{TEXT_CREAM}",
+        title_font_color=f"{TEXT_CREAM}",
+        # Darker color for lines and axes
+        xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+        yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+        legend_title_text='Period' # Correct legend title
+    )
+    st.plotly_chart(fig_season_lines, use_container_width=True)
+    
+    # --- 5.5.2 Heatmap Chart ---
+    st.subheader("USDX Monthly Return Heatmap (By Year)")
+    df_seasonality_heatmap = load_seasonality_heatmap_data()
+    
+    if df_seasonality_heatmap is None:
+        st.info(f"Note: Heatmap file '{DXY_HEATMAP_PATH}' missing or invalid. Heatmap chart is not available.")
+    else:
+        # Reorder months for display (using Month_Index for sorting internally)
+        month_order = df_seasonality_lines['Month'].tolist()
+        
+        # Determine color range based on data for better contrast
+        max_abs = df_seasonality_heatmap['Return'].abs().max() * 1.05 # Add 5% buffer
+        
+        fig_heatmap = px.density_heatmap(df_seasonality_heatmap,
+                                     x="Month", 
+                                     y="Year", 
+                                     z="Return",
+                                     category_orders={"Month": month_order, "Year": sorted(df_seasonality_heatmap['Year'].unique(), reverse=True)},
+                                     color_continuous_scale='RdYlGn', # Red for negative, Green for positive
+                                     range_color=[-max_abs, max_abs],
+                                     title="Monthly Return Heatmap by Year")
 
-# Line Chart
-fig_season = px.line(df_seasonality, 
-                    x="Month", 
-                    y=y_column,
-                    title=f"Average Monthly Return",
-                    labels={y_column: "Average Return (%)", "Month": "Month"},
-                    markers=True, line_shape='linear') # Use line chart
+        fig_heatmap.update_layout(
+            plot_bgcolor=f"{BG_BLACK}", 
+            paper_bgcolor=f"{BG_BLACK}",
+            font_color=f"{TEXT_CREAM}",
+            title_font_color=f"{TEXT_CREAM}",
+            # Darker color for axes
+            xaxis=dict(tickangle=45, gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+            yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
+            coloraxis_colorbar=dict(title="Return (%)", tickfont=dict(color=TEXT_CREAM))
+        )
+        st.plotly_chart(fig_heatmap, use_container_width=True)
 
-# *** Adjustment: Set line color to light (TEXT_CREAM) ***
-fig_season.update_traces(line=dict(color=TEXT_CREAM), marker=dict(color=TEXT_CREAM))
-
-# Add zero line for clarity
-fig_season.add_hline(y=0, line_dash="dash", line_color=BORDER_DARK)
-
-fig_season.update_layout(
-    plot_bgcolor=f"{BG_BLACK}", 
-    paper_bgcolor=f"{BG_BLACK}",
-    font_color=f"{TEXT_CREAM}",
-    title_font_color=f"{TEXT_CREAM}",
-    # Darker color for lines and axes
-    xaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK),
-    yaxis=dict(gridcolor=BORDER_DARK, linecolor=BORDER_DARK)
-)
-st.plotly_chart(fig_season, use_container_width=True)
-
-st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
+    st.markdown("</div>", unsafe_allow_html=True) # End BLACK section
 st.markdown("<div class='section-spacer'></div>", unsafe_allow_html=True) # Spacer
     
 # -------------------------
