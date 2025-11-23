@@ -159,14 +159,14 @@ def load_seasonality_heatmap_data():
     if not os.path.exists(DXY_HEATMAP_PATH):
         return pd.DataFrame()
     try:
-        # ZMĚNA ZDE: Přidání decimal='.' zajišťuje správné čtení desetinných teček
+        # Přečteme soubor. decimal='.' zajišťuje, že čteme desetinnou tečku.
         df = pd.read_csv(DXY_HEATMAP_PATH, sep=',', decimal='.') 
         
         expected_cols = ['Year', 'Month', 'Return']
         if not all(col in df.columns for col in expected_cols):
             return pd.DataFrame()
             
-        # Zjednodušení, protože decimal='.' už zajistil správné parsování čísel.
+        # Explicitní typová konverze
         df['Return'] = pd.to_numeric(df['Return'], errors='coerce', downcast='float')
         df = df[df['Return'].notna()] # Odstraníme řádky, kde se parsování nepodařilo
         
@@ -444,7 +444,9 @@ else:
                                  y="Year", 
                                  z="Return",
                                  category_orders={"Month": month_order, "Year": year_order}, # Použití explicitního řazení let
-                                 color_continuous_scale='RdYlGn', 
+                                 # ZMĚNA ZDE: Použití RdBu škály (Red-White-Blue)
+                                 # Kladné výnosy jsou modré (tmavě modrá pro vysoké), záporné jsou červené.
+                                 color_continuous_scale='RdBu', 
                                  range_color=[-max_abs, max_abs],
                                  title="Monthly Return Heatmap by Year")
 
